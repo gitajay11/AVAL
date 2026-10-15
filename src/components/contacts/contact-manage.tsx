@@ -137,7 +137,7 @@ export function ContactManage({ initial }: { initial: ContactDetailDTO }) {
 
       <div className="mx-auto flex max-w-2xl flex-col gap-7 px-4 py-6 pb-[max(2rem,env(safe-area-inset-bottom))]">
         <Section id="contact-profile" title="Contact">
-          <form onSubmit={save} className="flex flex-col gap-4 py-4" noValidate>
+          <form method="post" onSubmit={save} className="flex flex-col gap-4 py-4" noValidate>
             <AvatarPicker
               name={contact.name}
               avatarUrl={contact.avatarUrl}

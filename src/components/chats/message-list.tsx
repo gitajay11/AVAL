@@ -5,6 +5,7 @@ import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { Spinner } from "@/components/ui/spinner";
 import { ClientTime, formatDay } from "@/lib/client/time";
 import type { TimelineItem, UiMessage } from "@/lib/chats/timeline";
+import { scrollBehavior } from "@/lib/client/motion";
 import { CHAT_HEADER_HEIGHT } from "./chat-header";
 import { MessageBubble, type Receipt } from "./message-bubble";
 
@@ -95,7 +96,7 @@ export const MessageList = forwardRef<VirtuosoHandle, Props>(function MessageLis
       initialTopMostItemIndex={{ index: initialIndex, align: initialIndex === items.length - 1 ? "end" : "start" }}
       alignToBottom
       computeItemKey={(_, item) => item.key}
-      followOutput={(atBottom) => (atBottom ? "smooth" : false)}
+      followOutput={(atBottom) => (atBottom ? scrollBehavior() : false)}
       atBottomThreshold={96}
       atBottomStateChange={onAtBottomChange}
       startReached={onStartReached}

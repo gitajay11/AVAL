@@ -1,12 +1,9 @@
 import { z } from "zod";
 import { MEDIA_LIMITS } from "@/lib/media/policy";
 import { multiLine, singleLine } from "./common";
+import { EDIT_WINDOW_MS, MAX_FORWARD_TARGETS, MAX_PINNED_CHATS, MESSAGE_MAX, PAGE_SIZE, REPORT_REASONS } from "./limits";
 
-export const MESSAGE_MAX = 4096;
-export const PAGE_SIZE = 30;
-export const EDIT_WINDOW_MS = 48 * 60 * 60 * 1000;
-export const MAX_PINNED_CHATS = 5;
-export const MAX_FORWARD_TARGETS = 10;
+export { EDIT_WINDOW_MS, MAX_FORWARD_TARGETS, MAX_PINNED_CHATS, MESSAGE_MAX, PAGE_SIZE, REPORT_REASONS };
 
 export const StartChatSchema = z.object({ userId: z.uuid() });
 
@@ -70,7 +67,6 @@ export const UploadRequestSchema = z
 
 export const ConfirmUploadSchema = z.object({ uploadId: z.uuid() });
 
-export const REPORT_REASONS = ["SPAM", "HARASSMENT", "IMPERSONATION", "INAPPROPRIATE", "OTHER"] as const;
 
 export const ReportSchema = z
   .object({

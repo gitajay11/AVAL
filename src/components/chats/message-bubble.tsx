@@ -55,7 +55,15 @@ function SystemLine({ message }: { message: UiMessage }) {
 }
 
 // Stable per-person name colours in groups (all AA on both surfaces).
-const NAME_COLORS = ["text-[#2563eb]", "text-[#0d9488]", "text-[#7c3aed]", "text-[#c2410c]", "text-[#db2777]", "text-[#15803d]"];
+// Sender names in groups: each pair is ≥4.5:1 on the incoming bubble in its theme.
+const NAME_COLORS = [
+  "text-[#2563eb] dark:text-[#60a5fa]",
+  "text-[#0f766e] dark:text-[#2dd4bf]",
+  "text-[#7c3aed] dark:text-[#a78bfa]",
+  "text-[#c2410c] dark:text-[#fb923c]",
+  "text-[#be185d] dark:text-[#f472b6]",
+  "text-[#15803d] dark:text-[#4ade80]",
+];
 const nameColor = (id: string) => NAME_COLORS[([...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0) >>> 0) % NAME_COLORS.length];
 
 export const MessageBubble = memo(function MessageBubble(props: Props) {

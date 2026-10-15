@@ -2,7 +2,7 @@
 
 A Telegram-style chat PWA. Next.js 16 (App Router) + Tailwind v4 + Motion on Vercel, Neon Postgres via Prisma 7, Ably for real-time, Cloudflare R2 for media, Upstash for rate limiting.
 
-**Status: Phase 5 — groups, message search and push notifications.** Checklists: [phase 1](docs/phase-1-checklist.md), [phase 2](docs/phase-2-checklist.md), [phase 3](docs/phase-3-checklist.md), [phase 4](docs/phase-4-checklist.md), [phase 5](docs/phase-5-checklist.md).
+**Status: Phase 6 — polish and PWA install (all six phases done).** Deploy guide: [docs/deploy.md](docs/deploy.md). Checklists: [phase 1](docs/phase-1-checklist.md), [phase 2](docs/phase-2-checklist.md), [phase 3](docs/phase-3-checklist.md), [phase 4](docs/phase-4-checklist.md), [phase 5](docs/phase-5-checklist.md), [phase 6](docs/phase-6-checklist.md).
 
 ## Architecture in one screen
 
@@ -21,7 +21,9 @@ A Telegram-style chat PWA. Next.js 16 (App Router) + Tailwind v4 + Motion on Ver
 | Search | Postgres full-text search on `messages.search_vector` (GIN index, `simple` config, trigger-maintained). The query is rebuilt from letters and digits only ([src/lib/search/tsquery.ts](src/lib/search/tsquery.ts)), so user input can never inject tsquery operators. In-chat search uses the same access check as reading the chat; global search joins on my memberships and applies "clear history" and "delete for me" in the same query. Keyset-paginated, rate-limited. Picking a result loads a window around that message (`?around=`) and lets you scroll both ways. |
 | Push | Web Push with VAPID ([src/lib/push](src/lib/push)). Subscriptions are per device (HTTPS endpoints only) and removed on sign-out, "sign out everywhere", password reset, and when the push service answers 404/410. Not sent for muted chats, personal contacts, your own messages, blocked people, or when *New messages* is off; *Show message preview* controls whether text is included. The service worker shows nothing when that chat is already open and focused, and offers **Reply** (posts with your cookie, same authorization as the app) and **Open**. |
 | Receipts | Per-member watermarks in `receipts`: *delivered* advances when the chat list loads or a message reaches a device; *read* when the chat is open and scrolled to the bottom. ✓ sent, ✓✓ delivered, green ✓✓ read. |
-| Client storage | None. No localStorage/IndexedDB; the only JS-readable cookie is the theme preference. Logout sends `Clear-Site-Data: "cache"` and empties Cache Storage. |
+| Client storage | No localStorage, sessionStorage or IndexedDB. JS-readable cookies: the theme preference and "install banner dismissed". Cache Storage holds only the static app shell (below). Logout sends `Clear-Site-Data: "cache"` and deletes every cache. |
+| PWA | [Manifest](src/app/manifest.ts) with any + maskable icons (generated from the logo by `pnpm icons`), Android/desktop install prompt and iOS "Add to Home Screen" steps ([pwa.tsx](src/components/app/pwa.tsx)). The [service worker](public/sw.js) is registered as `/sw.js?v=<build id>` and caches **only** hashed build assets, icons and a static [offline page](public/offline.html): pages, RSC payloads, API responses and media are never intercepted for caching. Each deploy gets a fresh worker and cache, the previous cache is deleted, and open tabs learn about a newer build from `/api/version` and offer **Reload**. While offline, Next's `useOffline` drives a status bar, soft navigations wait for the network, and messages that failed to send are retried when the connection returns (de-duplicated by `clientId`). |
+| Accessibility | WCAG AA contrast for every text token on every surface in both themes, and 3:1 for focus rings, enforced by [tests/contrast.test.ts](tests/contrast.test.ts). Keyboard focus rings only (`:focus-visible`), no tap highlight, safe-area insets on all four edges, and `prefers-reduced-motion` turns springs into fades and smooth scrolling into jumps. |
 | Rendering | Cache Components: each page prerenders a static shell; session-dependent parts stream inside `<Suspense>`. `proxy.ts` only does optimistic redirects. |
 | Real-time | Clients hold an Ably token that can only **subscribe** (and enter presence) on `user:{theirId}`. Every event is published by the server after the API route has authorized it and written it to Postgres, to each recipient's own channel ([src/lib/realtime/server.ts](src/lib/realtime/server.ts)). Without Ably, the client polls. On reconnect it refetches what it missed. |
 | Chat data | Chat list is one indexed SQL query (last message, peer, privacy-filtered photo, unread count) rendered on the server. Messages load 30 at a time with a `(created_at, id)` keyset cursor into a virtualized list. Unread counts come from a per-member read watermark (`receipts`). |
@@ -77,6 +79,12 @@ Checks:
 pnpm test
 ```
 
+Query plans for the hot paths (local only: adds 20k messages and 200 chats, then removes them):
+
+```bash
+pnpm db:explain --synthetic
+```
+
 ```bash
 pnpm typecheck
 ```
@@ -101,15 +109,16 @@ pnpm lint
 
 ## Deploy to Vercel
 
-1. Push the repo to GitHub and import it in Vercel (framework: Next.js; defaults are fine).
-2. Add every variable from `.env.example` for **Production** and **Preview**. `APP_URL` must be the deployed origin.
-3. Run migrations against Neon before (or as part of) the first deploy, from your machine with production env loaded:
+Step by step, including the post-deploy checks: **[docs/deploy.md](docs/deploy.md)**. In short:
+
+1. Import the GitHub repo in Vercel, set the function region next to Neon, and add every variable from `.env.example` for Production and Preview.
+2. Apply migrations to Neon:
    ```bash
    pnpm db:migrate
    ```
-   To automate it, set the Vercel build command to `pnpm db:migrate && pnpm build`.
-4. Deploy. `vercel.json` registers a daily cron for `/api/cron/sweep` (stale uploads, expired sessions and tokens).
-5. After the first deploy, add the production origin to the R2 CORS policy.
+3. Deploy, add your domain to the R2 CORS policy, and add the Ably presence webhook.
+
+The service worker and manifest need no extra setup; each deploy rolls out a new worker automatically.
 
 ## Migrations
 
@@ -129,7 +138,12 @@ src/lib/contacts/           contact access policy, service (requests, grants, no
 src/lib/groups/             group service (create, members, roles, leave), avatar URLs
 src/lib/search/             tsquery builder, in-chat and global message search
 src/lib/push/               VAPID sender (cleans dead subscriptions), message/access-request notifications
-public/sw.js                service worker: push, notification Reply/Open (no data caching)
+src/app/manifest.ts         web app manifest; icon.svg, apple-icon.png, favicon.ico are generated
+src/components/app/         app shell, PWA provider (install, updates), offline/update/install banners
+public/sw.js                service worker: static app-shell cache, offline page, push, notification Reply/Open
+public/offline.html         static page shown when a full page load fails offline
+public/icons/               PWA icons (any, maskable, badge), generated by `pnpm icons`
+scripts/                    icon generator, query-plan checker (`pnpm db:explain`)
 src/lib/media/              upload policy, signature sniffing, uploads, ref-counted deletion
 src/lib/link-preview.ts     SSRF-safe preview fetcher (pure parsing in link-meta.ts)
 src/lib/realtime/           Ably token + server-side publishing

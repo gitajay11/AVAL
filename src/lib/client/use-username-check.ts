@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usernameProblem } from "@/lib/validation/auth";
+import { usernameProblem } from "@/lib/validation/limits";
 import { api } from "./api";
 
 export type UsernameState =

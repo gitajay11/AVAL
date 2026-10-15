@@ -36,7 +36,7 @@ export function NewGroupSheet({ open, onClose }: { open: boolean; onClose: () =>
 
   return (
     <Sheet open={open} onClose={onClose} title="New group" description="Add people who accept messages from you.">
-      <form onSubmit={create} className="flex flex-col gap-4 pt-1">
+      <form method="post" onSubmit={create} className="flex flex-col gap-4 pt-1">
         <Input label="Group name" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={64} required autoFocus />
         <PeoplePicker picked={picked} onChange={setPicked} />
         <Button type="submit" loading={busy} disabled={!title.trim() || picked.length === 0}>

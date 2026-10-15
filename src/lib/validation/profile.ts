@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { bio, dateOfBirth, displayName } from "./auth";
+import { AUDIENCES, AVATAR_MAX_BYTES, AVATAR_TYPES } from "./limits";
 
-export const AUDIENCES = ["EVERYONE", "CONTACTS", "NOBODY"] as const;
+export { AUDIENCES, AVATAR_MAX_BYTES, AVATAR_TYPES };
 export const audience = z.enum(AUDIENCES);
 
 export const UpdateProfileSchema = z
@@ -24,8 +25,6 @@ export const UpdateSettingsSchema = z
   })
   .partial();
 
-export const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
-export const AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 
 export const AvatarUploadSchema = z.object({
   contentType: z.enum(AVATAR_TYPES),

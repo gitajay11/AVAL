@@ -15,7 +15,7 @@
   --glass: rgb(255 255 255 / 0.72);
   --text: #0b1b2b;
   --text-muted: #46596c; /* 7.0:1 on surface */
-  --text-subtle: #5d7084; /* 5.0:1 on surface */
+  --text-subtle: #576b7f; /* ≥4.7:1 on every light surface */
   --border: rgb(11 27 43 / 0.09);
   --border-strong: rgb(11 27 43 / 0.16);
   --primary: #1d4ed8;
@@ -24,7 +24,7 @@
   --accent-soft: rgb(16 185 129 / 0.12);
   --danger: #b91c1c;
   --danger-soft: rgb(220 38 38 / 0.1);
-  --ring: #10b981;
+  --ring: #059669; /* ≥3.2:1 on every light surface (focus indicator) */
   --grad-from: #1d4ed8;
   --grad-to: #0f766e;
   --shadow-sm: 0 1px 2px rgb(11 27 43 / 0.06), 0 1px 1px rgb(11 27 43 / 0.04);

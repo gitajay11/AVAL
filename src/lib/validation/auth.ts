@@ -1,27 +1,8 @@
 import { z } from "zod";
 import { cleanText, multiLine, singleLine } from "./common";
+import { MIN_AGE_YEARS, PASSWORD_MAX, PASSWORD_MIN, USERNAME_MAX, USERNAME_MIN, usernameProblem } from "./limits";
 
-export const USERNAME_MIN = 3;
-export const USERNAME_MAX = 20;
-export const PASSWORD_MIN = 8;
-export const PASSWORD_MAX = 128;
-export const MIN_AGE_YEARS = 13;
-
-const RESERVED_USERNAMES = new Set([
-  "admin", "administrator", "aval", "api", "app", "help", "login", "logout", "me",
-  "moderator", "null", "official", "root", "security", "settings", "signup", "staff",
-  "support", "system", "undefined", "verify",
-]);
-
-/** Why a username is invalid, or null when it is fine. Shared by the form and the API. */
-export function usernameProblem(raw: string): string | null {
-  const v = raw.trim().toLowerCase();
-  if (v.length < USERNAME_MIN) return `At least ${USERNAME_MIN} characters`;
-  if (v.length > USERNAME_MAX) return `At most ${USERNAME_MAX} characters`;
-  if (!/^[a-z0-9_.]+$/.test(v)) return "Only letters, numbers, _ and .";
-  if (RESERVED_USERNAMES.has(v)) return "This username is reserved";
-  return null;
-}
+export { MIN_AGE_YEARS, PASSWORD_MAX, PASSWORD_MIN, USERNAME_MAX, USERNAME_MIN, usernameProblem };
 
 export const username = z
   .string()

@@ -11,7 +11,7 @@ import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
 import { api, ClientApiError } from "@/lib/client/api";
 import type { ChatListItemDTO, MessageDTO, UserProfileDTO } from "@/lib/chats/types";
-import { MAX_FORWARD_TARGETS, REPORT_REASONS } from "@/lib/validation/chat";
+import { MAX_FORWARD_TARGETS, REPORT_REASONS } from "@/lib/validation/limits";
 import { useChats } from "./chat-store";
 
 const errorText = (err: unknown, fallback: string) => (err instanceof ClientApiError ? err.message : fallback);

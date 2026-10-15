@@ -2,6 +2,13 @@ import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV !== "production";
 
+// Identifies this build. The service worker is registered as /sw.js?v=<id>, so
+// every deploy installs a fresh worker with its own app-shell cache, and open
+// tabs can tell that a newer version is live (/api/version).
+const buildId = isDev
+  ? "dev"
+  : (process.env.VERCEL_DEPLOYMENT_ID ?? process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? Date.now().toString(36));
+
 // Static CSP (no nonces) so pages keep their prerendered static shells. Inline
 // scripts are Next's own bootstrap; user content is never rendered as HTML.
 // connect/img/media allow R2 (presigned uploads, signed reads) and Ably (real-time).
@@ -42,6 +49,12 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   poweredByHeader: false,
+  env: { NEXT_PUBLIC_BUILD_ID: buildId },
+  experimental: {
+    // Soft navigations wait for the network to return instead of failing, and
+    // useOffline() drives the offline banner.
+    useOffline: true,
+  },
   turbopack: {
     rules: {
       "*.css": {
@@ -55,6 +68,7 @@ const nextConfig: NextConfig = {
       { source: "/:path*", headers: securityHeaders },
       // The service worker must always be revalidated so updates roll out.
       { source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache" }, { key: "Content-Type", value: "application/javascript; charset=utf-8" }] },
+      { source: "/offline.html", headers: [{ key: "Cache-Control", value: "no-cache" }] },
     ];
   },
 };

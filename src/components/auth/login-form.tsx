@@ -48,7 +48,8 @@ export function LoginForm() {
         </>
       }
     >
-      <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
+      {/* method="post": a submit before hydration must never put credentials in the URL. */}
+      <form method="post" onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
         <FormError message={error} />
         <Input
           label="Username or email"

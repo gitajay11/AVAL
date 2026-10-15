@@ -65,7 +65,7 @@ export function ResetForm() {
 
   return (
     <AuthCard title="Choose a new password" subtitle="You'll be signed out on all devices.">
-      <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
+      <form method="post" onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
         <FormError message={error} />
         <div className="flex flex-col gap-2">
           <Input

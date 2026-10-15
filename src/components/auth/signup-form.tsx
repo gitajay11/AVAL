@@ -10,7 +10,7 @@ import { Input, Textarea } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import { api, ClientApiError } from "@/lib/client/api";
 import { useUsernameCheck, type UsernameState } from "@/lib/client/use-username-check";
-import { USERNAME_MAX } from "@/lib/validation/auth";
+import { USERNAME_MAX } from "@/lib/validation/limits";
 import { AuthCard, FormError } from "./auth-card";
 import { PasswordMeter } from "./password-meter";
 
@@ -98,7 +98,7 @@ export function SignupForm() {
         </>
       }
     >
-      <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
+      <form method="post" onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
         <FormError message={error} />
         <Input
           label="Display name"

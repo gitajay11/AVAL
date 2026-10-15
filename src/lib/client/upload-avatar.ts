@@ -2,7 +2,7 @@
 
 import type { MyContactDTO } from "@/lib/contacts/types";
 import type { Me } from "@/lib/users";
-import { AVATAR_MAX_BYTES } from "@/lib/validation/profile";
+import { AVATAR_MAX_BYTES } from "@/lib/validation/limits";
 import { api, ClientApiError } from "./api";
 
 const OUTPUT_SIZE = 512;

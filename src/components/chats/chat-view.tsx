@@ -15,11 +15,12 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { api, ClientApiError } from "@/lib/client/api";
 import { uploadMedia, type PreparedMedia } from "@/lib/client/media-upload";
+import { scrollBehavior } from "@/lib/client/motion";
 import { encodeCursor } from "@/lib/chats/cursor";
 import { buildTimeline, messageKey, upsertSorted, type TimelineItem, type UiMessage } from "@/lib/chats/timeline";
 import type { AttachmentDTO, ChatDetailDTO, MemberDTO, MessageDTO, MessagePage, MessageWindow, ReactionDTO, ReceiptDTO } from "@/lib/chats/types";
 import type { PublicContactDTO } from "@/lib/contacts/types";
-import { EDIT_WINDOW_MS } from "@/lib/validation/chat";
+import { EDIT_WINDOW_MS } from "@/lib/validation/limits";
 import { ChatActionsContext, type ChatActions } from "./chat-actions";
 import { ChatHeader } from "./chat-header";
 import { useChats } from "./chat-store";
@@ -134,6 +135,7 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
   const [footerHeight, setFooterHeight] = useState(80);
   const footer = useRef<HTMLDivElement>(null);
   const jobs = useRef(new Map<string, Job>());
+  const offlineFailed = useRef(new Set<string>());
 
   // Animate only messages that arrive or are sent while the chat is open, once.
   const fresh = useRef(new Set<string>());
@@ -143,7 +145,7 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
   };
   const shouldAnimate = useCallback((key: string) => fresh.current.has(key), []);
 
-  const scrollToBottom = useCallback((behavior: "smooth" | "auto" = "smooth") => {
+  const scrollToBottom = useCallback((behavior: "smooth" | "auto" = scrollBehavior()) => {
     requestAnimationFrame(() => list.current?.scrollToIndex({ index: "LAST", align: "end", behavior }));
   }, []);
 
@@ -383,7 +385,9 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
         applyMessage(message, { countUnread: false });
       } catch (err) {
         setPendingState(clientId, { status: "failed" });
-        if (err instanceof ClientApiError) toast(err.message, "error");
+        // Lost connection: retried automatically when it returns (the offline bar says so).
+        if (!(err instanceof ClientApiError) || err.status === 0) offlineFailed.current.add(clientId);
+        else toast(err.message, "error");
       }
     },
     [applyMessage, chatId, receive, setPendingState, toast],
@@ -444,11 +448,20 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
 
   const retry = useCallback(
     (clientId: string) => {
+      offlineFailed.current.delete(clientId);
       setPendingState(clientId, { status: "sending" });
       post(clientId);
     },
     [post, setPendingState],
   );
+
+  // Sends that failed for lack of network go out again once it's back. The
+  // server de-duplicates by clientId, so a send that did arrive isn't doubled.
+  useEffect(() => {
+    const online = () => [...offlineFailed.current].forEach(retry);
+    window.addEventListener("online", online);
+    return () => window.removeEventListener("online", online);
+  }, [retry]);
 
   const toggleReaction = useCallback(
     (m: MessageDTO, emoji: string) => {
@@ -476,7 +489,7 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
     async (id: string) => {
       const idx = itemsRef.current.findIndex((i) => i.kind === "message" && i.message.id === id);
       if (idx !== -1) {
-        list.current?.scrollToIndex({ index: idx, align: "center", behavior: "smooth" });
+        list.current?.scrollToIndex({ index: idx, align: "center", behavior: scrollBehavior() });
         flash(id);
         return;
       }

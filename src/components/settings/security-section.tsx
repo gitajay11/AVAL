@@ -124,7 +124,7 @@ function ChangePassword() {
     );
   }
   return (
-    <form onSubmit={submit} className="flex flex-col gap-4 py-4" noValidate>
+    <form method="post" onSubmit={submit} className="flex flex-col gap-4 py-4" noValidate>
       <Input
         label="Current password"
         type="password"

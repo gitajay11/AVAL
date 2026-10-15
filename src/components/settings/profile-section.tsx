@@ -52,7 +52,7 @@ export function ProfileSection({ me, onChange }: { me: Me; onChange: (me: Me) =>
 
   return (
     <Section id="profile" title="Profile">
-      <form onSubmit={save} className="flex flex-col gap-4 py-4" noValidate>
+      <form method="post" onSubmit={save} className="flex flex-col gap-4 py-4" noValidate>
         <AvatarPicker name={me.displayName} avatarUrl={me.avatarUrl} onChange={applyUser} size={96} />
         <p className="-mt-1 text-center text-[15px] text-muted">@{me.username}</p>
         <Input label="Display name" value={form.displayName} onChange={set("displayName")} error={fields.displayName} maxLength={64} />

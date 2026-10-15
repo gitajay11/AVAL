@@ -13,7 +13,9 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "db:seed": "tsx prisma/seed-dev.mts"
+    "db:seed": "tsx prisma/seed-dev.mts",
+    "db:explain": "tsx --conditions=react-server --env-file-if-exists=.env scripts/explain.mts",
+    "icons": "tsx scripts/icons.mts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1152.0",
@@ -53,6 +55,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.1",
     "prisma": "7.10.0",
+    "sharp": "0.35.5",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5",

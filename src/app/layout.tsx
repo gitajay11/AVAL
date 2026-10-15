@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
+import { installScript } from "@/components/app/pwa";
 import { Providers } from "@/components/providers";
 import { themeScript } from "@/components/theme";
 import "./globals.css";
@@ -33,7 +34,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={jakarta.variable} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script dangerouslySetInnerHTML={{ __html: themeScript + installScript }} />
       </head>
       <body className="min-h-dvh">
         <Providers>{children}</Providers>

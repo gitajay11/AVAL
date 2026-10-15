@@ -8,6 +8,7 @@ import { Archive, Bell, BookUser, ChevronLeft, ChevronRight, MessageCircleMore, 
 import { PublicContactResults } from "@/components/contacts/public-contact-results";
 import { useNotifications } from "@/components/notifications/notifications-provider";
 import { useUser } from "@/components/app/user-context";
+import { InstallBanner } from "@/components/app/pwa-banners";
 import { VerifyBanner } from "@/components/app/verify-banner";
 import { useRealtime } from "@/components/realtime/realtime-provider";
 import { ActionMenu } from "@/components/ui/action-menu";
@@ -149,6 +150,7 @@ export function ChatSidebar() {
       </header>
 
       {!me.emailVerified && <VerifyBanner />}
+      {!searching && !showArchived && <InstallBanner />}
 
       <nav aria-label="Chats" className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom)]">
         {searching && chatMatches.length > 0 && (

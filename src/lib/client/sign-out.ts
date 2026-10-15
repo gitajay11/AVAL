@@ -18,6 +18,8 @@ export async function signOut(everywhere = false) {
       const keys = await caches.keys().catch(() => []);
       await Promise.all(keys.map((k) => caches.delete(k)));
     }
+    // Also ask the worker, in case it is mid-way through caching an asset.
+    navigator.serviceWorker?.controller?.postMessage({ type: "CLEAR_CACHES" });
     window.location.replace("/login");
   }
 }

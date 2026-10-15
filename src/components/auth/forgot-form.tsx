@@ -55,7 +55,7 @@ export function ForgotForm() {
 
   return (
     <AuthCard title="Forgot your password?" subtitle="We'll email you a link to choose a new one." footer={back}>
-      <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
+      <form method="post" onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
         <FormError message={error} />
         <Input
           label="Email"

@@ -9,7 +9,7 @@ import { ClientApiError } from "@/lib/client/api";
 import { prepareFile, type PreparedMedia } from "@/lib/client/media-upload";
 import type { MessageDTO } from "@/lib/chats/types";
 import { formatBytes } from "@/lib/media/policy";
-import { MESSAGE_MAX } from "@/lib/validation/chat";
+import { MESSAGE_MAX } from "@/lib/validation/limits";
 import { EmojiPicker } from "./emoji-picker";
 import { snippetOf } from "./message-snippet";
 import { useVoiceRecorder } from "./use-voice-recorder";
@@ -242,6 +242,7 @@ export function Composer({ chatId, onSend, onTyping, replyTo, onCancelReply, edi
       </AnimatePresence>
 
       <form
+        method="post"
         onSubmit={(e) => {
           e.preventDefault();
           submit();

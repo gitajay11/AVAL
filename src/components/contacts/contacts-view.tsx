@@ -52,7 +52,7 @@ function CreateContactSheet({ open, onClose }: { open: boolean; onClose: () => v
 
   return (
     <Sheet open={open} onClose={onClose} title="New personal contact" description="Not a real account: a person you write to, like a journal.">
-      <form onSubmit={create} className="flex flex-col gap-4 pt-2" noValidate>
+      <form method="post" onSubmit={create} className="flex flex-col gap-4 pt-2" noValidate>
         <Input label="Name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} error={fields.name} maxLength={64} autoFocus />
         <Textarea label="Note" optional value={form.note} onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))} error={fields.note} maxLength={500} rows={2} />
         <Segmented

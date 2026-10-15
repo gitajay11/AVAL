@@ -15,9 +15,13 @@ function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
 const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent);
 const isStandalone = () => window.matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;
 
+/** One worker per build (its app-shell cache is per build too). */
+const SW_URL = `/sw.js?v=${encodeURIComponent(process.env.NEXT_PUBLIC_BUILD_ID ?? "dev")}`;
+
+/** The app's service worker registration. Registering the same URL again is a no-op; a new build's URL updates it. */
 export async function registration(): Promise<ServiceWorkerRegistration | null> {
   if (!("serviceWorker" in navigator)) return null;
-  return (await navigator.serviceWorker.getRegistration("/")) ?? navigator.serviceWorker.register("/sw.js", { scope: "/" });
+  return navigator.serviceWorker.register(SW_URL, { scope: "/", updateViaCache: "none" });
 }
 
 /** Where push stands on this device. */

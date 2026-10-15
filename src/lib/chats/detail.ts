@@ -48,9 +48,8 @@ export async function getChatDetail(me: SessionUser, chatId: string): Promise<Ch
   const [chat, page, receipts, reason, pinned, blockedByMe, members, group] = await Promise.all([
     getChatItem(me.id, chatId),
     listMessagesBefore(me.id, chatId, m.clearedAt, null),
-    m.chat.type === "CONTACT"
-      ? Promise.resolve([])
-      : db.receipt.findMany({ where: { chatId }, select: { userId: true, lastDeliveredAt: true, lastReadAt: true } }),
+    // Every member's watermark, mine included (a contact's journal has only mine).
+    db.receipt.findMany({ where: { chatId }, select: { userId: true, lastDeliveredAt: true, lastReadAt: true } }),
     cantSendReason(me, m),
     latestPinned(me.id, chatId, m.clearedAt),
     peerId ? hasBlocked(me.id, peerId) : Promise.resolve(false),
@@ -58,7 +57,7 @@ export async function getChatDetail(me: SessionUser, chatId: string): Promise<Ch
     isGroup ? db.chat.findUnique({ where: { id: chatId }, select: { description: true } }) : Promise.resolve(null),
   ]);
   if (!chat) return null;
-  const mine = await db.receipt.findUnique({ where: { chatId_userId: { chatId, userId: me.id } }, select: { lastReadAt: true } });
+  const mine = receipts.find((r) => r.userId === me.id);
   return {
     chat,
     access: "member",

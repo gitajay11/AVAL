@@ -1,10 +1,114 @@
 /* Aval service worker.
- * Phase 5: push notifications only. It caches nothing (Phase 6 adds an app-shell
- * cache for static assets only; messages and user data are never cached here).
+ *
+ * Caches ONLY the static app shell: hashed build assets (/_next/static: JS, CSS,
+ * fonts), icons and the offline page. Pages, RSC payloads, API responses and
+ * media are never intercepted or stored, so no message, chat, contact or user
+ * data ever lands in Cache Storage. Sign-out deletes every cache.
+ *
+ * Registered as /sw.js?v=<build id>: each deploy is a new worker with its own
+ * cache, and the previous build's cache is deleted when it activates.
  */
 
-self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+const VERSION = new URL(self.location.href).searchParams.get("v") || "dev";
+const SHELL = `aval-shell-${VERSION}`;
+// In development the build assets aren't content-hashed, so nothing is cached.
+const CACHING = VERSION !== "dev";
+const OFFLINE_URL = "/offline.html";
+const PRECACHE = [OFFLINE_URL, "/icons/icon-192.png", "/icons/badge-72.png"];
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(SHELL);
+      await cache.addAll(PRECACHE);
+      // The page that registered this worker is already running this build, so
+      // take over at once; older tabs recover via Next's hard reload on a stale chunk.
+      await self.skipWaiting();
+    })(),
+  );
+});
+
+/** Delete other builds' caches. */
+async function pruneOldCaches() {
+  const keys = await caches.keys();
+  await Promise.all(keys.filter((k) => k.startsWith("aval-") && k !== SHELL).map((k) => caches.delete(k)));
+}
+
+/** False once a newer build's worker has taken over (this one may still finish a few fetches). */
+const isCurrent = () => self.registration.active?.scriptURL === self.location.href;
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      await pruneOldCaches();
+      if (self.registration.navigationPreload) await self.registration.navigationPreload.enable();
+      await self.clients.claim();
+    })(),
+  );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.origin && event.origin !== self.location.origin) return;
+  if (event.data?.type === "CLEAR_CACHES") {
+    event.waitUntil(caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))));
+  }
+});
+
+const isShellAsset = (url) =>
+  url.pathname.startsWith("/_next/static/") ||
+  url.pathname.startsWith("/icons/") ||
+  url.pathname === "/icon.svg" ||
+  url.pathname === "/apple-icon.png" ||
+  url.pathname === "/favicon.ico";
+
+let pruned = false;
+
+/** Cache-first for immutable build assets and icons. Only successful same-origin responses are stored. */
+async function shellAsset(event) {
+  const { request } = event;
+  // The previous worker may have re-created its cache while handing over; sweep once more.
+  if (!pruned && isCurrent()) {
+    pruned = true;
+    event.waitUntil(pruneOldCaches());
+  }
+  const hit = await caches.match(request, { cacheName: SHELL });
+  if (hit) return hit;
+  const res = await fetch(request);
+  // A replaced worker stops writing, so it can't resurrect its old cache.
+  if (res.ok && res.type === "basic" && isCurrent()) {
+    const copy = res.clone();
+    event.waitUntil(caches.open(SHELL).then((cache) => cache.put(request, copy)));
+  }
+  return res;
+}
+
+/** Pages always come from the network (they contain user data); offline → the static offline page. */
+async function navigate(event) {
+  try {
+    const preload = await event.preloadResponse;
+    return preload || (await fetch(event.request));
+  } catch {
+    return (await caches.match(OFFLINE_URL)) || Response.error();
+  }
+}
+
+self.addEventListener("fetch", (event) => {
+  const { request } = event;
+  if (request.method !== "GET") return;
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+
+  if (request.mode === "navigate") {
+    event.respondWith(navigate(event));
+    return;
+  }
+  if (CACHING && isShellAsset(url) && !request.headers.has("RSC")) {
+    event.respondWith(shellAsset(event));
+  }
+  // Everything else (API, media, RSC, manifest) goes straight to the network.
+});
+
+/* ───────────── Push ───────────── */
 
 /** Is a visible, focused window already showing this chat? Then don't notify. */
 async function chatIsOnScreen(chatId) {
@@ -29,7 +133,7 @@ self.addEventListener("push", (event) => {
       await self.registration.showNotification(data.title || "Aval", {
         body: data.body || "",
         tag: data.tag,
-        renotify: true,
+        renotify: Boolean(data.tag),
         icon: "/icons/icon-192.png",
         badge: "/icons/badge-72.png",
         data: { url: data.url || "/chats", chatId: data.chatId || null },

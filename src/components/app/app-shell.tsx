@@ -9,7 +9,7 @@ import { NotificationsProvider } from "@/components/notifications/notifications-
 import { RealtimeProvider } from "@/components/realtime/realtime-provider";
 import { cn } from "@/lib/cn";
 import type { ChatListItemDTO } from "@/lib/chats/types";
-import { ServiceWorker } from "./service-worker";
+import { OfflineBar } from "./pwa-banners";
 import { UserProvider, type ClientUser } from "./user-context";
 
 /**
@@ -30,12 +30,12 @@ export function AppShell({
 
   return (
     <UserProvider user={user}>
-      <ServiceWorker />
+      <OfflineBar />
       <RealtimeProvider userId={user.id}>
         <ChatsProvider meId={user.id} initialChats={initialChats}>
           <NotificationsProvider>
           <LightboxProvider>
-          <div className="flex h-dvh overflow-hidden bg-bg">
+          <div className="flex h-dvh overflow-hidden bg-bg pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
             <aside
               className={cn(
                 "flex w-full flex-col border-line bg-surface md:w-[360px] md:shrink-0 md:border-r lg:w-[400px]",

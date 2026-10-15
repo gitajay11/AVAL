@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/toast";
 import { api, ClientApiError } from "@/lib/client/api";
 import type { Me } from "@/lib/users";
-import type { AUDIENCES } from "@/lib/validation/profile";
+import type { AUDIENCES } from "@/lib/validation/limits";
 import { PushToggle } from "./push-toggle";
 import { Divider, Section } from "./section";
 
