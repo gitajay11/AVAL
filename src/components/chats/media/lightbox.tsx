@@ -5,7 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import { createPortal } from "react-dom";
 import { Download, X } from "lucide-react";
 
-type Item = { src: string; alt: string; downloadUrl: string };
+type Item = { src: string; alt: string; downloadUrl: string | null };
 
 const LightboxContext = createContext<(item: Item) => void>(() => {});
 
@@ -43,14 +43,16 @@ export function LightboxProvider({ children }: { children: React.ReactNode }) {
                 onClick={close}
               >
                 <div className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 flex gap-2">
-                  <a
-                    href={item.downloadUrl}
-                    onClick={(e) => e.stopPropagation()}
-                    className="grid size-11 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20"
-                    aria-label="Download"
-                  >
-                    <Download className="size-5" />
-                  </a>
+                  {item.downloadUrl && (
+                    <a
+                      href={item.downloadUrl}
+                      onClick={(e) => e.stopPropagation()}
+                      className="grid size-11 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20"
+                      aria-label="Download"
+                    >
+                      <Download className="size-5" />
+                    </a>
+                  )}
                   <button
                     type="button"
                     onClick={close}

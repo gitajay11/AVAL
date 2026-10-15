@@ -1,6 +1,7 @@
 import "server-only";
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { contactAvatarUrl } from "@/lib/contacts/urls";
 import { avatarUrl } from "@/lib/users";
 import { PAGE_SIZE } from "@/lib/validation/chat";
 import { encodeCursor, type Cursor } from "./cursor";
@@ -38,6 +39,10 @@ type ChatRow = {
   peer_avatar_visible: boolean | null;
   peer_delivered_at: Date | null;
   peer_read_at: Date | null;
+  contact_id: string | null;
+  contact_name: string | null;
+  contact_avatar_key: string | null;
+  contact_visibility: "PRIVATE" | "PUBLIC" | null;
   unread: number;
 };
 
@@ -48,7 +53,10 @@ type ChatRow = {
  * messages(chat_id, created_at), messages(chat_id, sender_id), chat_members(user_id, …).
  */
 function chatRows(me: string, opts: { chatId?: string; limit: number }) {
-  const only = opts.chatId ? Prisma.sql`AND c.id = ${opts.chatId}::uuid` : Prisma.sql`AND c.last_message_at IS NOT NULL`;
+  // Empty chats stay out of the list, except a contact's journal (it starts empty).
+  const only = opts.chatId
+    ? Prisma.sql`AND c.id = ${opts.chatId}::uuid`
+    : Prisma.sql`AND (c.last_message_at IS NOT NULL OR c.type = 'CONTACT')`;
   return db.$queryRaw<ChatRow[]>`
     SELECT
       c.id, c.type::text AS type, c.title, c.created_at, c.last_message_at,
@@ -69,6 +77,8 @@ function chatRows(me: string, opts: { chatId?: string; limit: number }) {
         )
       ) AS peer_avatar_visible,
       pr.last_delivered_at AS peer_delivered_at, pr.last_read_at AS peer_read_at,
+      pc.id AS contact_id, pc.name AS contact_name, pc.avatar_key AS contact_avatar_key,
+      pc.visibility::text AS contact_visibility,
       (
         SELECT count(*)::int FROM (
           SELECT 1 FROM messages um
@@ -100,6 +110,7 @@ function chatRows(me: string, opts: { chatId?: string; limit: number }) {
       LIMIT 1
     ) p ON c.type = 'DIRECT'
     LEFT JOIN receipts pr ON pr.chat_id = c.id AND pr.user_id = p.id
+    LEFT JOIN personal_contacts pc ON pc.id = c.contact_id
     WHERE cm.user_id = ${me}::uuid ${only}
     ORDER BY cm.pinned_at DESC NULLS LAST, COALESCE(c.last_message_at, c.created_at) DESC, c.id DESC
     LIMIT ${opts.limit}
@@ -118,9 +129,10 @@ function toChatItem(r: ChatRow): ChatListItemDTO {
   return {
     id: r.id,
     type: r.type,
-    title: r.title ?? peer?.displayName ?? "Chat",
-    avatarUrl: peer?.avatarUrl ?? null,
+    title: r.title ?? r.contact_name ?? peer?.displayName ?? "Chat",
+    avatarUrl: r.contact_id ? contactAvatarUrl(r.contact_id, r.contact_avatar_key) : (peer?.avatarUrl ?? null),
     peer,
+    contact: r.contact_id ? { id: r.contact_id, visibility: r.contact_visibility! } : null,
     lastMessage: r.lm_id
       ? {
           id: r.lm_id,
@@ -153,6 +165,40 @@ export async function listChats(me: string): Promise<ChatListItemDTO[]> {
 export async function getChatItem(me: string, chatId: string): Promise<ChatListItemDTO | null> {
   const [row] = await chatRows(me, { chatId, limit: 1 });
   return row ? toChatItem(row) : null;
+}
+
+/**
+ * A shared contact's journal as an approved viewer sees it: no membership state
+ * (pin, archive, unread), no owner identity, just the contact and its last message.
+ */
+export async function getViewerChatItem(
+  chatId: string,
+  contact: { id: string; name: string; avatarKey: string | null; visibility: "PRIVATE" | "PUBLIC"; createdAt: Date },
+): Promise<ChatListItemDTO> {
+  const last = await db.message.findFirst({
+    where: { chatId },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: { id: true, senderId: true, type: true, text: true, createdAt: true, deletedAt: true },
+  });
+  return {
+    id: chatId,
+    type: "CONTACT",
+    title: contact.name,
+    avatarUrl: contactAvatarUrl(contact.id, contact.avatarKey),
+    peer: null,
+    contact: { id: contact.id, visibility: contact.visibility },
+    lastMessage: last
+      ? { id: last.id, senderId: null, type: last.type, text: last.deletedAt ? null : last.text, createdAt: last.createdAt.toISOString(), deleted: last.deletedAt !== null }
+      : null,
+    lastActivityAt: (last?.createdAt ?? contact.createdAt).toISOString(),
+    unread: 0,
+    pinned: false,
+    archived: false,
+    muted: false,
+    markedUnread: false,
+    peerDeliveredAt: null,
+    peerReadAt: null,
+  };
 }
 
 // ─────────────────────────── Messages ───────────────────────────

@@ -12,7 +12,8 @@ import { Attachments, LinkPreviewCard } from "./media/attachments";
 import { snippetOf } from "./message-snippet";
 import { MessageText } from "./message-text";
 
-export type Receipt = "sending" | "failed" | "sent" | "delivered" | "read";
+/** "none": journals (personal contacts) have nobody to deliver to. */
+export type Receipt = "sending" | "failed" | "sent" | "delivered" | "read" | "none";
 
 type Props = {
   message: UiMessage;
@@ -26,7 +27,7 @@ type Props = {
 
 function Ticks({ receipt, onBrand }: { receipt: Receipt; onBrand: boolean }) {
   if (receipt === "sending") return <Clock3 className="size-3" aria-label="Sending" />;
-  if (receipt === "failed") return null;
+  if (receipt === "failed" || receipt === "none") return null;
   if (receipt === "sent") return <Check className="size-3.5" aria-label="Sent" />;
   return (
     <CheckCheck
@@ -46,7 +47,8 @@ export const MessageBubble = memo(function MessageBubble({ message, mine, groupS
   const touch = useTouch();
   const x = useMotionValue(0);
   const replyIconOpacity = useTransform(x, [-SWIPE_TRIGGER, -16, 0], [1, 0, 0]);
-  const longPress = useLongPress((point) => actions.openMenu(message, point), !message.deleted && message.status === "sent");
+  const interactive = !actions.readOnly && !message.deleted && message.status === "sent";
+  const longPress = useLongPress((point) => actions.openMenu(message, point), interactive);
 
   const jumbo = !message.deleted && !message.attachments.length && isJumboEmoji(message.text);
   const media = message.attachments.find((a) => a.kind === "IMAGE" || a.kind === "VIDEO");
@@ -85,6 +87,7 @@ export const MessageBubble = memo(function MessageBubble({ message, mine, groupS
             animate={{ scale: 1 }}
             whileTap={{ scale: 0.85 }}
             onClick={() => actions.toggleReaction(message, r.emoji)}
+            disabled={actions.readOnly}
             aria-pressed={reacted}
             aria-label={`${r.emoji} ${r.userIds.length}${reacted ? ", including you" : ""}`}
             className={cn(
@@ -111,7 +114,7 @@ export const MessageBubble = memo(function MessageBubble({ message, mine, groupS
       className={cn("relative flex px-3 sm:px-5", mine ? "justify-end" : "justify-start", groupStart ? "pt-2" : "pt-[3px]")}
       data-message-id={message.id}
     >
-      {touch && !message.deleted && (
+      {touch && interactive && (
         <motion.span
           style={{ opacity: replyIconOpacity }}
           className="pointer-events-none absolute top-1/2 right-4 grid size-8 -translate-y-1/2 place-items-center rounded-full bg-surface-3 text-accent"
@@ -125,7 +128,7 @@ export const MessageBubble = memo(function MessageBubble({ message, mine, groupS
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: "spring", stiffness: 520, damping: 34, mass: 0.7 }}
         style={{ transformOrigin: mine ? "bottom right" : "bottom left", x, touchAction: "pan-y" }}
-        drag={touch && !message.deleted && message.status === "sent" ? "x" : false}
+        drag={touch && interactive ? "x" : false}
         dragDirectionLock
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={{ left: 0.45, right: 0 }}
@@ -181,7 +184,7 @@ export const MessageBubble = memo(function MessageBubble({ message, mine, groupS
             <>
               {message.attachments.length > 0 && (
                 <div className={cn("relative", message.text && "mb-1.5")}>
-                  <Attachments attachments={message.attachments} mine={mine} />
+                  <Attachments attachments={message.attachments} mine={mine} canDownload={!actions.readOnly} />
                   {uploading && (
                     <span className="absolute inset-0 grid place-items-center rounded-[14px] bg-black/35">
                       <svg viewBox="0 0 36 36" className="size-12 -rotate-90" aria-label={`Uploading ${Math.round((message.upload ?? 0) * 100)}%`}>

@@ -40,8 +40,8 @@ export function directPeerId(m: Membership, userId: string): string | null {
   return a === userId ? b : a;
 }
 
-/** User ids that should receive real-time events for a chat. */
-export async function chatAudience(chatId: string): Promise<string[]> {
+/** Members of a chat (for receipts and typing; see chatAudience for message events). */
+export async function chatMembers(chatId: string): Promise<string[]> {
   const members = await db.chatMember.findMany({ where: { chatId }, select: { userId: true } });
   return members.map((m) => m.userId);
 }

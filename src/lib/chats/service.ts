@@ -2,7 +2,8 @@ import "server-only";
 import { after } from "next/server";
 import { Prisma } from "@/generated/prisma/client";
 import { ApiError } from "@/lib/api";
-import { chatAudience, directPeerId, getMembership, requireMessage, type Membership } from "@/lib/authz/chats";
+import { chatMembers, directPeerId, getMembership, requireMessage, type Membership } from "@/lib/authz/chats";
+import { chatAudience } from "@/lib/authz/contacts";
 import { canMessage, directKey, isBlockedEitherWay } from "@/lib/authz/privacy";
 import { db, uniqueViolation } from "@/lib/db";
 import { attachLinkPreview, firstUrl } from "@/lib/link-preview";
@@ -342,7 +343,7 @@ export async function setStarred(meId: string, messageId: string, starred: boole
 
 /** Tell the other members about my new watermarks (drives their ✓✓). */
 async function publishReceipt(meId: string, chatId: string, lastDeliveredAt: Date | null, lastReadAt: Date | null) {
-  const others = (await chatAudience(chatId)).filter((id) => id !== meId);
+  const others = (await chatMembers(chatId)).filter((id) => id !== meId);
   await publishToUsers(others, "receipt", {
     chatId,
     userId: meId,
@@ -401,6 +402,7 @@ export async function markAllDelivered(meId: string) {
 export async function relayTyping(meId: string, m: Membership) {
   const peerId = directPeerId(m, meId);
   if (peerId && (await isBlockedEitherWay(meId, peerId))) return;
-  const others = (await chatAudience(m.chat.id)).filter((id) => id !== meId);
+  if (m.chat.type === "CONTACT") return; // a journal has no one to type to
+  const others = (await chatMembers(m.chat.id)).filter((id) => id !== meId);
   await publishToUsers(others, "typing", { chatId: m.chat.id, userId: meId });
 }

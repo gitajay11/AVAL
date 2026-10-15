@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download, FileText, ImageOff } from "lucide-react";
+import { Download, EyeOff, FileText, ImageOff } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { AttachmentDTO, LinkPreviewDTO } from "@/lib/chats/types";
 import { formatBytes } from "@/lib/media/policy";
@@ -18,14 +18,14 @@ function fit(width: number | null, height: number | null) {
   return { width: Math.max(160, Math.round(width * scale)), height: Math.max(100, Math.round(height * scale)) };
 }
 
-function ImageAttachment({ a }: { a: AttachmentDTO }) {
+function ImageAttachment({ a, canDownload }: { a: AttachmentDTO; canDownload: boolean }) {
   const open = useLightbox();
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const box = fit(a.width, a.height);
   return (
     <button
       type="button"
-      onClick={() => open({ src: a.url, alt: a.fileName ?? "Photo", downloadUrl: `${a.url}?download=1` })}
+      onClick={() => open({ src: a.url, alt: a.fileName ?? "Photo", downloadUrl: canDownload ? `${a.url}?download=1` : null })}
       className="relative block max-w-full overflow-hidden rounded-[14px] bg-surface-3"
       style={{ width: box.width, aspectRatio: `${box.width} / ${box.height}` }}
       aria-label="Open photo"
@@ -51,12 +51,13 @@ function ImageAttachment({ a }: { a: AttachmentDTO }) {
   );
 }
 
-function VideoAttachment({ a }: { a: AttachmentDTO }) {
+function VideoAttachment({ a, canDownload }: { a: AttachmentDTO; canDownload: boolean }) {
   const box = fit(a.width, a.height);
   return (
     <video
       src={a.url}
       controls
+      {...(canDownload ? {} : { controlsList: "nodownload", onContextMenu: (e: React.MouseEvent) => e.preventDefault() })}
       playsInline
       preload="metadata"
       className="block max-w-full rounded-[14px] bg-black"
@@ -65,7 +66,22 @@ function VideoAttachment({ a }: { a: AttachmentDTO }) {
   );
 }
 
-function FileAttachment({ a, mine }: { a: AttachmentDTO; mine: boolean }) {
+function FileAttachment({ a, mine, canDownload }: { a: AttachmentDTO; mine: boolean; canDownload: boolean }) {
+  if (!canDownload) {
+    return (
+      <div className="flex max-w-[300px] items-center gap-3 rounded-[14px] bg-surface-2 p-2 pr-3">
+        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-surface-3 text-muted">
+          <FileText className="size-5" aria-hidden="true" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[14px] font-semibold">{a.fileName ?? "File"}</span>
+          <span className="flex items-center gap-1 text-xs text-muted">
+            <EyeOff className="size-3" aria-hidden="true" /> Not available in view-only
+          </span>
+        </span>
+      </div>
+    );
+  }
   return (
     <a
       href={`${a.url}?download=1`}
@@ -86,18 +102,18 @@ function FileAttachment({ a, mine }: { a: AttachmentDTO; mine: boolean }) {
   );
 }
 
-export function Attachments({ attachments, mine }: { attachments: AttachmentDTO[]; mine: boolean }) {
+export function Attachments({ attachments, mine, canDownload = true }: { attachments: AttachmentDTO[]; mine: boolean; canDownload?: boolean }) {
   return (
     <div className="flex flex-col gap-1.5">
       {attachments.map((a) =>
         a.kind === "IMAGE" ? (
-          <ImageAttachment key={a.id} a={a} />
+          <ImageAttachment key={a.id} a={a} canDownload={canDownload} />
         ) : a.kind === "VIDEO" ? (
-          <VideoAttachment key={a.id} a={a} />
+          <VideoAttachment key={a.id} a={a} canDownload={canDownload} />
         ) : a.kind === "VOICE" ? (
           <VoicePlayer key={a.id} a={a} mine={mine} />
         ) : (
-          <FileAttachment key={a.id} a={a} mine={mine} />
+          <FileAttachment key={a.id} a={a} mine={mine} canDownload={canDownload} />
         ),
       )}
     </div>

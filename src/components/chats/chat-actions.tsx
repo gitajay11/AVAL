@@ -6,6 +6,8 @@ import type { MessageDTO } from "@/lib/chats/types";
 /** Callbacks a message row needs, provided once by the chat screen (keeps rows memoizable). */
 export type ChatActions = {
   meId: string;
+  /** Viewing someone's shared contact: no menu, swipe, reactions or downloads. */
+  readOnly: boolean;
   nameOf: (userId: string | null) => string;
   retry: (clientId: string) => void;
   reply: (m: MessageDTO) => void;

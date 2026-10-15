@@ -149,7 +149,7 @@ const REASON_LABELS: Record<(typeof REPORT_REASONS)[number], string> = {
   OTHER: "Something else",
 };
 
-export type ReportTarget = { userId?: string; messageId?: string; label: string } | null;
+export type ReportTarget = { userId?: string; messageId?: string; contactId?: string; label: string } | null;
 
 export function ReportSheet({ target, onClose }: { target: ReportTarget; onClose: () => void }) {
   const toast = useToast();
@@ -162,7 +162,13 @@ export function ReportSheet({ target, onClose }: { target: ReportTarget; onClose
     setSending(true);
     try {
       await api("/api/reports", {
-        body: { targetUserId: target.userId, targetMessageId: target.messageId, reason, details: details || undefined },
+        body: {
+          targetUserId: target.userId,
+          targetMessageId: target.messageId,
+          targetContactId: target.contactId,
+          reason,
+          details: details || undefined,
+        },
       });
       toast("Thanks. We'll review your report.");
       setDetails("");

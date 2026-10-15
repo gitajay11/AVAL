@@ -33,13 +33,16 @@ export function useRealtimeEvent(listener: Listener) {
 }
 
 const PING_MS = 60_000;
+const PING_MIN_GAP_MS = 30_000;
+let lastPing = 0;
 
 function usePresenceHeartbeat() {
   useEffect(() => {
     const ping = () => {
-      if (document.visibilityState === "visible") {
-        fetch("/api/presence/ping", { method: "POST", credentials: "same-origin" }).catch(() => {});
-      }
+      // Throttled across remounts and rapid focus changes (the server keeps 30s anyway).
+      if (document.visibilityState !== "visible" || Date.now() - lastPing < PING_MIN_GAP_MS) return;
+      lastPing = Date.now();
+      fetch("/api/presence/ping", { method: "POST", credentials: "same-origin" }).catch(() => {});
     };
     ping();
     const t = setInterval(ping, PING_MS);

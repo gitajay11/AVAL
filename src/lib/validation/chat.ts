@@ -76,7 +76,8 @@ export const ReportSchema = z
   .object({
     targetUserId: z.uuid().optional(),
     targetMessageId: z.uuid().optional(),
+    targetContactId: z.uuid().optional(),
     reason: z.enum(REPORT_REASONS),
     details: multiLine(1000).optional(),
   })
-  .refine((r) => r.targetUserId || r.targetMessageId, { message: "Nothing to report" });
+  .refine((r) => r.targetUserId || r.targetMessageId || r.targetContactId, { message: "Nothing to report" });

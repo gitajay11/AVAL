@@ -8,17 +8,28 @@ import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
 import { api, ClientApiError } from "@/lib/client/api";
 import { uploadAvatar } from "@/lib/client/upload-avatar";
+import type { MyContactDTO } from "@/lib/contacts/types";
 import type { Me } from "@/lib/users";
 
 type Props = {
   name: string;
   avatarUrl: string | null;
-  onChange: (me: Me) => void;
   size?: number;
-};
+} & (
+  | { contactId?: undefined; onChange: (me: Me) => void }
+  | { contactId: string; onChange: (contact: MyContactDTO) => void }
+);
 
-/** Tap the photo to choose a new one; a preview shows immediately while it uploads. */
-export function AvatarPicker({ name, avatarUrl, onChange, size = 112 }: Props) {
+/**
+ * Tap the photo to choose a new one; a preview shows immediately while it
+ * uploads. Sets my own photo, or a personal contact's with `contactId`.
+ */
+export function AvatarPicker({ name, avatarUrl, size = 112, ...target }: Props) {
+  const apply = (r: { user?: Me; contact?: MyContactDTO }) => {
+    if (target.contactId !== undefined) {
+      if (r.contact) target.onChange(r.contact);
+    } else if (r.user) target.onChange(r.user);
+  };
   const input = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -32,8 +43,8 @@ export function AvatarPicker({ name, avatarUrl, onChange, size = 112 }: Props) {
     setPreview(local);
     setBusy(true);
     try {
-      onChange(await uploadAvatar(file));
-      toast("Profile photo updated");
+      apply(await uploadAvatar(file, target.contactId));
+      toast("Photo updated");
     } catch (err) {
       toast(err instanceof ClientApiError ? err.message : "Upload failed.", "error");
     } finally {
@@ -46,9 +57,13 @@ export function AvatarPicker({ name, avatarUrl, onChange, size = 112 }: Props) {
   async function onRemove() {
     setBusy(true);
     try {
-      const { user } = await api<{ user: Me }>("/api/me/avatar", { method: "DELETE" });
-      onChange(user);
-      toast("Profile photo removed");
+      if (target.contactId !== undefined) {
+        const r = await api<{ contact: MyContactDTO }>(`/api/contacts/${target.contactId}`, { method: "PATCH", body: { removeAvatar: true } });
+        apply(r);
+      } else {
+        apply(await api<{ user: Me }>("/api/me/avatar", { method: "DELETE" }));
+      }
+      toast("Photo removed");
     } catch (err) {
       toast(err instanceof ClientApiError ? err.message : "Couldn't remove photo.", "error");
     } finally {

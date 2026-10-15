@@ -4,7 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { useRef, useState } from "react";
-import { Archive, ChevronLeft, ChevronRight, MessageCircleMore, Search, Settings, SquarePen, Star, X } from "lucide-react";
+import { Archive, Bell, BookUser, ChevronLeft, ChevronRight, MessageCircleMore, Search, SquarePen, Star, X } from "lucide-react";
+import { PublicContactResults } from "@/components/contacts/public-contact-results";
+import { useNotifications } from "@/components/notifications/notifications-provider";
 import { useUser } from "@/components/app/user-context";
 import { VerifyBanner } from "@/components/app/verify-banner";
 import { useRealtime } from "@/components/realtime/realtime-provider";
@@ -28,6 +30,7 @@ export function ChatSidebar() {
   const me = useUser();
   const pathname = usePathname();
   const { chats, typing } = useChats();
+  const { unread: unreadNotifications } = useNotifications();
   const [query, setQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -64,9 +67,28 @@ export function ChatSidebar() {
             {showArchived ? "Archived" : "Chats"} <ConnectionPill />
           </h1>
           <Link
+            href="/notifications"
+            className="relative grid size-10 place-items-center rounded-xl text-muted hover:bg-surface-3 hover:text-fg"
+            aria-label={unreadNotifications ? `Notifications, ${unreadNotifications} new` : "Notifications"}
+          >
+            <Bell className="size-5" />
+            {unreadNotifications > 0 && (
+              <span className="absolute top-1 right-1 grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-bold text-white">
+                {unreadNotifications > 9 ? "9+" : unreadNotifications}
+              </span>
+            )}
+          </Link>
+          <Link
+            href="/contacts"
+            className="grid size-10 place-items-center rounded-xl text-muted hover:bg-surface-3 hover:text-fg"
+            aria-label="Contacts"
+          >
+            <BookUser className="size-5" />
+          </Link>
+          <Link
             href="/saved"
             className="grid size-10 place-items-center rounded-xl text-muted hover:bg-surface-3 hover:text-fg"
-            aria-label="Saved messages"
+            aria-label="Starred messages"
           >
             <Star className="size-5" />
           </Link>
@@ -78,13 +100,6 @@ export function ChatSidebar() {
           >
             <SquarePen className="size-5" />
           </button>
-          <Link
-            href="/settings"
-            className="grid size-10 place-items-center rounded-xl text-muted hover:bg-surface-3 hover:text-fg"
-            aria-label="Settings"
-          >
-            <Settings className="size-5" />
-          </Link>
         </div>
         <label className="relative mt-3 block">
           <span className="sr-only">Search chats and people</span>
@@ -95,7 +110,7 @@ export function ChatSidebar() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Escape" && setQuery("")}
-            placeholder="Search chats or @username"
+            placeholder="Search chats, @people or contacts"
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
@@ -151,6 +166,7 @@ export function ChatSidebar() {
         </ul>
 
         {searching && <PeopleResults query={query} onOpened={() => setQuery("")} />}
+        {searching && <PublicContactResults query={query} heading="Public contacts" />}
 
         {showArchived && !searching && archived.length === 0 && (
           <p className="px-6 py-10 text-center text-[15px] text-muted">No archived chats. Swipe a chat or right-click it to archive.</p>

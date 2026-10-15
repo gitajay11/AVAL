@@ -1,3 +1,5 @@
+import type { NotificationDTO } from "@/lib/contacts/types";
+
 // Shapes shared by the API, the server-rendered pages and the client stores.
 // Dates are ISO strings so they serialize unchanged across every boundary.
 
@@ -78,6 +80,8 @@ export type ChatListItemDTO = {
   archived: boolean;
   muted: boolean;
   markedUnread: boolean;
+  /** CONTACT: the personal contact behind this one-way chat. */
+  contact: { id: string; visibility: "PRIVATE" | "PUBLIC" } | null;
   /** DIRECT: the peer's receipt watermarks, for ✓✓ on my last message. */
   peerDeliveredAt: string | null;
   peerReadAt: string | null;
@@ -99,6 +103,8 @@ export type ReceiptDTO = { userId: string; lastDeliveredAt: string | null; lastR
 
 export type ChatDetailDTO = {
   chat: ChatListItemDTO;
+  /** "viewer": read-only access to someone's shared contact (no sending, reacting, forwarding or downloads). */
+  access: "member" | "viewer";
   /** Last time I read this chat; drives the "unread messages" divider. */
   myLastReadAt: string | null;
   /** Whether I may send here (blocks, recipient privacy, unverified email). */
@@ -128,6 +134,8 @@ export type RealtimeEvent =
   | { name: "chat.read"; data: { chatId: string; lastReadAt: string } }
   | { name: "chat.settings"; data: { chatId: string } & ChatSettingsDTO }
   | { name: "typing"; data: { chatId: string; userId: string } }
-  | { name: "presence"; data: { userId: string; presence: PresenceDTO } };
+  | { name: "presence"; data: { userId: string; presence: PresenceDTO } }
+  | { name: "notification.new"; data: { notification: NotificationDTO } }
+  | { name: "contact.access"; data: { contactId: string; chatId: string; access: "granted" | "revoked" } };
 
 export type RealtimeEventName = RealtimeEvent["name"];

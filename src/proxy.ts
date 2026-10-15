@@ -3,7 +3,7 @@ import { SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth/cookie";
 
 // Optimistic routing only: whether a session cookie exists. Real validation
 // happens on the server for every page and API call.
-const APP_PREFIXES = ["/chats", "/settings", "/saved", "/welcome"];
+const APP_PREFIXES = ["/chats", "/contacts", "/notifications", "/settings", "/saved", "/welcome"];
 const AUTH_PAGES = ["/login", "/signup"];
 
 export function proxy(req: NextRequest) {

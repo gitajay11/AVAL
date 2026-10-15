@@ -148,7 +148,8 @@ export function ChatsProvider({
 
   const refetchChat = useCallback((chatId: string) => {
     api<ChatDetailDTO>(`/api/chats/${chatId}`)
-      .then((d) => dispatch({ type: "upsert", chat: d.chat }))
+      // Shared contacts I only view never enter my chat list.
+      .then((d) => d.access === "member" && dispatch({ type: "upsert", chat: d.chat }))
       .catch(() => {});
   }, []);
 

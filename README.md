@@ -2,7 +2,7 @@
 
 A Telegram-style chat PWA. Next.js 16 (App Router) + Tailwind v4 + Motion on Vercel, Neon Postgres via Prisma 7, Ably for real-time, Cloudflare R2 for media, Upstash for rate limiting.
 
-**Status: Phase 3 — media, message actions and receipts.** Checklists: [phase 1](docs/phase-1-checklist.md), [phase 2](docs/phase-2-checklist.md), [phase 3](docs/phase-3-checklist.md).
+**Status: Phase 4 — personal contacts and access requests.** Checklists: [phase 1](docs/phase-1-checklist.md), [phase 2](docs/phase-2-checklist.md), [phase 3](docs/phase-3-checklist.md), [phase 4](docs/phase-4-checklist.md).
 
 ## Architecture in one screen
 
@@ -16,6 +16,7 @@ A Telegram-style chat PWA. Next.js 16 (App Router) + Tailwind v4 + Motion on Ver
 | Email links | Tokens travel in the URL **fragment** (`#token=`), so they never reach server logs or `Referer`. Single-use, hashed at rest, superseded by newer links. |
 | Media | Images are downscaled and re-encoded in the browser (strips EXIF/GPS). Upload = presigned PUT that signs exact `Content-Type` + `Content-Length` → confirm checks size and real file signature (images, video, audio) → attach to a message. Reads go through `/api/media/:id`, which checks chat membership, deletion and "delete for me", then redirects to a 1-hour signed URL. Plain files are always served as downloads. Forwarded media share the R2 object; objects are deleted when no attachment references them. |
 | Link previews | Fetched server-side after sending, with an SSRF guard at connect time (every resolved IP checked, private/link-local/metadata ranges refused, ports 80/443 only, redirects re-validated, 512 KB cap, 5 s timeout). The page's image is copied into R2, so browsers never load third-party URLs. |
+| Personal contacts | A contact is a one-way chat (type `CONTACT`, the owner is its only member). Who may see it is decided in one pure function, [`contactRole`](src/lib/contacts/policy.ts): owner, viewer (approved and still public), discoverable (public: name and photo only) or hidden (private, or blocked either way). Every route goes through [src/lib/authz/contacts.ts](src/lib/authz/contacts.ts). Viewers get read access via `getChatAccess`; every write still requires chat membership, so they're read-only by construction (no sending, reacting, forwarding, starring or downloads). Going Private, revoking, blocking or deleting ends access on the next request, and real-time recipients are recomputed per event. |
 | Receipts | Per-member watermarks in `receipts`: *delivered* advances when the chat list loads or a message reaches a device; *read* when the chat is open and scrolled to the bottom. ✓ sent, ✓✓ delivered, green ✓✓ read. |
 | Client storage | None. No localStorage/IndexedDB; the only JS-readable cookie is the theme preference. Logout sends `Clear-Site-Data: "cache"` and empties Cache Storage. |
 | Rendering | Cache Components: each page prerenders a static shell; session-dependent parts stream inside `<Suspense>`. `proxy.ts` only does optimistic redirects. |
@@ -114,11 +115,14 @@ src/app/(app)/              signed-in shell: chats, settings
 src/app/api/                route handlers (auth, me, uploads, media, cron)
 src/lib/                    server libs: db, env, api helpers, auth, security, r2, mail
 src/lib/chats/              chat queries, services, receipts, cursor, timeline, shared types
+src/lib/contacts/           contact access policy, service (requests, grants, notifications), types
 src/lib/media/              upload policy, signature sniffing, uploads, ref-counted deletion
 src/lib/link-preview.ts     SSRF-safe preview fetcher (pure parsing in link-meta.ts)
 src/lib/realtime/           Ably token + server-side publishing
 src/lib/client/             browser helpers (fetch wrapper, upload, time, hooks)
 src/components/chats/       chat list, search, conversation, composer, menus, dialogs, media players
+src/components/contacts/    contacts pages, owner management, public contact sheet
+src/components/notifications/ in-app notifications (provider + page)
 src/components/realtime/    Ably connection / polling fallback provider
 src/components/             UI kit, auth screens, settings, app shell
 tests/                      vitest unit tests

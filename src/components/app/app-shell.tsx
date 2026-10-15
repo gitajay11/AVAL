@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { ChatSidebar } from "@/components/chats/chat-sidebar";
 import { ChatsProvider } from "@/components/chats/chat-store";
 import { LightboxProvider } from "@/components/chats/media/lightbox";
+import { NotificationsProvider } from "@/components/notifications/notifications-provider";
 import { RealtimeProvider } from "@/components/realtime/realtime-provider";
 import { cn } from "@/lib/cn";
 import type { ChatListItemDTO } from "@/lib/chats/types";
@@ -30,6 +31,7 @@ export function AppShell({
     <UserProvider user={user}>
       <RealtimeProvider userId={user.id}>
         <ChatsProvider meId={user.id} initialChats={initialChats}>
+          <NotificationsProvider>
           <LightboxProvider>
           <div className="flex h-dvh overflow-hidden bg-bg">
             <aside
@@ -57,6 +59,7 @@ export function AppShell({
             </main>
           </div>
           </LightboxProvider>
+          </NotificationsProvider>
         </ChatsProvider>
       </RealtimeProvider>
     </UserProvider>

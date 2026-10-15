@@ -1,5 +1,6 @@
 import { ApiError, json, route } from "@/lib/api";
 import { requireSession } from "@/lib/auth/session";
+import { endSharingBetween } from "@/lib/contacts/service";
 import { db } from "@/lib/db";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { uuid } from "@/lib/validation/common";
@@ -16,7 +17,8 @@ async function target(ctx: Ctx, meId: string): Promise<string> {
 
 /**
  * Block: they can't message, react, see my photo, status or typing, or find me
- * in search; I stop receiving their messages. Takes effect on the next request.
+ * (or my public contacts) in search; I stop receiving their messages; any
+ * contact sharing between us ends. Takes effect on the next request.
  */
 export const POST = route<Ctx>(async (_req, ctx) => {
   const { user } = await requireSession();
@@ -27,6 +29,7 @@ export const POST = route<Ctx>(async (_req, ctx) => {
     create: { blockerId: user.id, blockedId },
     update: {},
   });
+  await endSharingBetween(user.id, blockedId);
   return json({ blocked: true });
 });
 

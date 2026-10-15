@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { VirtuosoHandle } from "react-virtuoso";
-import { ChevronDown, Copy, Flag, Forward, Lock, Pencil, Pin, PinOff, Reply, Star, StarOff, Trash2 } from "lucide-react";
+import { ChevronDown, Copy, Eye, Flag, Forward, Lock, Pencil, Pin, PinOff, Reply, Star, StarOff, Trash2 } from "lucide-react";
+import { PublicContactSheet } from "@/components/contacts/public-contact-sheet";
 import { useUser } from "@/components/app/user-context";
 import { useRealtime, useRealtimeEvent } from "@/components/realtime/realtime-provider";
 import { ActionMenu, type MenuItem } from "@/components/ui/action-menu";
@@ -15,6 +16,7 @@ import { uploadMedia, type PreparedMedia } from "@/lib/client/media-upload";
 import { encodeCursor } from "@/lib/chats/cursor";
 import { buildTimeline, messageKey, upsertSorted, type TimelineItem, type UiMessage } from "@/lib/chats/timeline";
 import type { AttachmentDTO, ChatDetailDTO, MessageDTO, MessagePage, ReactionDTO, ReceiptDTO } from "@/lib/chats/types";
+import type { PublicContactDTO } from "@/lib/contacts/types";
 import { EDIT_WINDOW_MS } from "@/lib/validation/chat";
 import { ChatActionsContext, type ChatActions } from "./chat-actions";
 import { ChatHeader } from "./chat-header";
@@ -63,6 +65,10 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
   const { chats, applyMessage, markRead, setActiveChat } = useChats();
   const { status } = useRealtime();
   const chat = chats.find((c) => c.id === chatId) ?? detail.chat;
+  // A shared contact I only view: everything is read-only (enforced by the server too).
+  const readOnly = detail.access === "viewer";
+  const isJournal = chat.type === "CONTACT";
+  const [contactCard, setContactCard] = useState<PublicContactDTO | null>(null);
 
   // Fixed for this visit: where the "unread messages" divider goes.
   const [unreadAfter] = useState(() => (detail.chat.unread > 0 ? (detail.myLastReadAt ?? "") : null));
@@ -193,6 +199,21 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
     setReceipts(latest);
   }, [chatId, receive]);
 
+  // Access can end at any time (revoked, made private, blocked, deleted): the
+  // server then answers 404, and the chat closes instead of going stale.
+  const leftRef = useRef(false);
+  const leave = useCallback(() => {
+    if (leftRef.current) return;
+    leftRef.current = true;
+    toast(readOnly ? "Your access to this contact has ended." : "This chat is no longer available.", "error");
+    router.replace(readOnly ? "/contacts" : "/chats");
+  }, [readOnly, router, toast]);
+  const safeCatchUp = useCallback(() => {
+    catchUp().catch((err) => {
+      if (err instanceof ClientApiError && err.status === 404) leave();
+    });
+  }, [catchUp, leave]);
+
   useRealtimeEvent((e) => {
     switch (e.name) {
       case "message.new":
@@ -218,8 +239,12 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
           setReceipts((cur) => [...cur.filter((x) => x.userId !== userId), { userId, lastDeliveredAt, lastReadAt }]);
         }
         break;
+      case "contact.access":
+        // The owner revoked my access, made it private, or deleted it: leave now.
+        if (e.data.chatId === chatId && e.data.access === "revoked") leave();
+        break;
       case "resync":
-        catchUp().catch(() => {});
+        safeCatchUp();
         break;
     }
   });
@@ -228,10 +253,10 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
   useEffect(() => {
     if (status !== "polling") return;
     const t = setInterval(() => {
-      if (document.visibilityState === "visible") catchUp().catch(() => {});
+      if (document.visibilityState === "visible") safeCatchUp();
     }, POLL_MS);
     return () => clearInterval(t);
-  }, [status, catchUp]);
+  }, [status, safeCatchUp]);
 
   const loadOlder = useCallback(async () => {
     const cur = stateRef.current;
@@ -383,24 +408,26 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
   const actions = useMemo<ChatActions>(
     () => ({
       meId: me.id,
+      readOnly,
       nameOf,
       retry,
       reply: (m) => canSend && setReplyTo(m),
-      openMenu: (m, point) => setMenu({ message: m, point, openedAt: Date.now() }),
-      toggleReaction,
+      openMenu: (m, point) => !readOnly && setMenu({ message: m, point, openedAt: Date.now() }),
+      toggleReaction: (m, emoji) => !readOnly && toggleReaction(m, emoji),
       jumpTo,
     }),
-    [canSend, jumpTo, me.id, nameOf, retry, toggleReaction],
+    [canSend, jumpTo, me.id, nameOf, readOnly, retry, toggleReaction],
   );
 
   const receiptFor = useCallback(
     (m: UiMessage): Receipt => {
       if (m.status !== "sent") return m.status;
+      if (isJournal) return "none";
       if (receipts.length && receipts.every((r) => r.lastReadAt && r.lastReadAt >= m.createdAt)) return "read";
       if (receipts.length && receipts.every((r) => r.lastDeliveredAt && r.lastDeliveredAt >= m.createdAt)) return "delivered";
       return "sent";
     },
-    [receipts],
+    [isJournal, receipts],
   );
 
   async function submitEdit(text: string) {
@@ -481,8 +508,8 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
   );
 
   const onTyping = useCallback(() => {
-    if (status === "live") api(`/api/chats/${chatId}/typing`, { method: "POST" }).catch(() => {});
-  }, [chatId, status]);
+    if (status === "live" && !isJournal) api(`/api/chats/${chatId}/typing`, { method: "POST" }).catch(() => {});
+  }, [chatId, isJournal, status]);
 
   const onAtBottomChange = useCallback((bottom: boolean) => {
     atBottomRef.current = bottom;
@@ -500,6 +527,14 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, []);
 
+  // Coming back to the tab: catch up at once (and notice lost access) rather
+  // than waiting for the next poll or event.
+  useEffect(() => {
+    const onVis = () => document.visibilityState === "visible" && safeCatchUp();
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [safeCatchUp]);
+
   useEffect(() => {
     setActiveChat(atBottom && visible ? chatId : null);
     return () => setActiveChat(null);
@@ -507,14 +542,14 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
 
   const lastMarked = useRef<string | null>(null);
   useEffect(() => {
-    if (!atBottom || !visible) return;
+    if (!atBottom || !visible || readOnly) return;
     const lastIncoming = s.confirmed.findLast((m) => m.senderId !== me.id);
     if (!lastIncoming) return;
     if (lastMarked.current && lastIncoming.createdAt <= lastMarked.current) return;
     if (!lastMarked.current && chat.unread === 0 && !chat.markedUnread && detail.myLastReadAt && lastIncoming.createdAt <= detail.myLastReadAt) return;
     lastMarked.current = lastIncoming.createdAt;
     markRead(chatId, lastIncoming.createdAt);
-  }, [atBottom, visible, s.confirmed, me.id, chatId, markRead, chat.unread, chat.markedUnread, detail.myLastReadAt]);
+  }, [atBottom, visible, readOnly, s.confirmed, me.id, chatId, markRead, chat.unread, chat.markedUnread, detail.myLastReadAt]);
 
   // Keep the list's bottom padding equal to the composer's height.
   useEffect(() => {
@@ -541,8 +576,15 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
       <div className="bg-chat relative h-full">
         <ChatHeader
           chat={chat}
+          readOnly={readOnly}
           pinned={pinned}
-          onOpenProfile={() => setProfileOpen(true)}
+          onOpenProfile={() => {
+            if (!chat.contact) return setProfileOpen(true);
+            if (!readOnly) return router.push(`/contacts/${chat.contact.id}`);
+            api<{ contact: PublicContactDTO }>(`/api/contacts/${chat.contact.id}/public`)
+              .then((r) => setContactCard(r.contact))
+              .catch(() => {});
+          }}
           onJumpToPinned={() => pinned && jumpTo(pinned.id)}
           onUnpin={() => pinned && setPin(pinned, false)}
         />
@@ -599,6 +641,11 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
               onSubmitEdit={submitEdit}
               onCancelEdit={() => setEditing(null)}
             />
+          ) : readOnly ? (
+            <div className="glass mx-auto flex max-w-lg items-center justify-center gap-2 rounded-2xl border border-line px-4 py-3 text-sm text-muted">
+              <Eye className="size-4 shrink-0" aria-hidden="true" />
+              View only. You can&apos;t reply, react, forward or download.
+            </div>
           ) : detail.blockedByMe ? (
             <div className="glass mx-auto flex max-w-lg items-center justify-between gap-3 rounded-2xl border border-line px-4 py-2.5">
               <p className="text-sm text-muted">You blocked {chat.title}.</p>
@@ -627,6 +674,7 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
           }
         />
         <ReportSheet target={reporting} onClose={() => setReporting(null)} />
+        <PublicContactSheet contact={contactCard} onClose={() => setContactCard(null)} onChange={setContactCard} />
         {chat.peer && (
           <ProfileSheet
             open={profileOpen}

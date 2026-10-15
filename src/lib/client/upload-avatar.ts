@@ -1,5 +1,6 @@
 "use client";
 
+import type { MyContactDTO } from "@/lib/contacts/types";
 import type { Me } from "@/lib/users";
 import { AVATAR_MAX_BYTES } from "@/lib/validation/profile";
 import { api, ClientApiError } from "./api";
@@ -27,8 +28,11 @@ async function toSquareWebp(file: File): Promise<Blob> {
   return blob;
 }
 
-/** Presign → PUT straight to R2 → confirm (server verifies size and file signature). */
-export async function uploadAvatar(file: File): Promise<Me> {
+/**
+ * Presign → PUT straight to R2 → confirm (server verifies size and file signature).
+ * With `contactId`, sets the photo of one of my personal contacts instead of mine.
+ */
+export async function uploadAvatar(file: File, contactId?: string): Promise<{ user?: Me; contact?: MyContactDTO }> {
   if (!file.type.startsWith("image/")) throw new ClientApiError(0, "type", "Choose an image file.");
   if (file.size > 25 * 1024 * 1024) throw new ClientApiError(0, "size", "That image is too large.");
 
@@ -37,12 +41,11 @@ export async function uploadAvatar(file: File): Promise<Me> {
 
   const { uploadId, url, headers } = await api<{ uploadId: string; url: string; headers: Record<string, string> }>(
     "/api/uploads/avatar",
-    { body: { contentType: blob.type, size: blob.size } },
+    { body: { contentType: blob.type, size: blob.size, contactId } },
   );
 
   const put = await fetch(url, { method: "PUT", headers, body: blob }).catch(() => null);
   if (!put?.ok) throw new ClientApiError(0, "upload", "Upload failed. Check your connection and try again.");
 
-  const { user } = await api<{ user: Me }>("/api/uploads/avatar/confirm", { body: { uploadId } });
-  return user;
+  return api<{ user?: Me; contact?: MyContactDTO }>("/api/uploads/avatar/confirm", { body: { uploadId } });
 }

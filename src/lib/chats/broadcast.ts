@@ -1,12 +1,15 @@
 import "server-only";
-import { chatAudience } from "@/lib/authz/chats";
+import { chatAudience } from "@/lib/authz/contacts";
 import { publishToUsers } from "@/lib/realtime/server";
 import { getMessage } from "./queries";
 import type { MessageDTO } from "./types";
 
-/** Publish a message event to every member of its chat. */
+/**
+ * Publish a message event to its chat's audience (members, plus approved viewers
+ * of a contact's journal). `starred` is per viewer, so it's never broadcast.
+ */
 export async function broadcast(name: "message.new" | "message.updated", message: MessageDTO) {
-  await publishToUsers(await chatAudience(message.chatId), name, { message });
+  await publishToUsers(await chatAudience(message.chatId), name, { message: { ...message, starred: false } });
 }
 
 /**

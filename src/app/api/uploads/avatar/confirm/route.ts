@@ -1,5 +1,7 @@
 import { ApiError, json, parseJson, route } from "@/lib/api";
 import { requireSession } from "@/lib/auth/session";
+import { requireOwnedContact } from "@/lib/authz/contacts";
+import { getContactDetail } from "@/lib/contacts/service";
 import { db } from "@/lib/db";
 import { sniffMime } from "@/lib/media/sniff";
 import { deleteObject, headObject, readHead, UPLOAD_URL_TTL_SECONDS } from "@/lib/r2";
@@ -32,6 +34,19 @@ export const POST = route(async (req) => {
   if (!head) throw new ApiError(409, "upload_missing", "Upload didn't finish. Please try again.");
   if (head.size !== upload.sizeBytes || head.size > AVATAR_MAX_BYTES) await reject("File size didn't match.");
   if (sniffMime(await readHead(upload.objectKey)) !== upload.mimeType) await reject("That file isn't a valid image.");
+
+  // A contact's photo: the contact id is in the key; ownership is re-checked now.
+  if (upload.objectKey.startsWith("contacts/")) {
+    const contactId = upload.objectKey.split("/")[1];
+    const contact = await requireOwnedContact(user.id, contactId);
+    await db.$transaction([
+      db.attachment.update({ where: { id: upload.id }, data: { status: "READY" } }),
+      db.personalContact.update({ where: { id: contactId }, data: { avatarKey: upload.objectKey } }),
+      ...(contact.avatarKey ? [db.attachment.deleteMany({ where: { objectKey: contact.avatarKey } })] : []),
+    ]);
+    if (contact.avatarKey) await deleteObject(contact.avatarKey);
+    return json({ contact: (await getContactDetail(user.id, contactId)).contact });
+  }
 
   const previous = await db.user.findUniqueOrThrow({ where: { id: user.id }, select: { avatarKey: true } });
   const [, row] = await db.$transaction([
