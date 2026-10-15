@@ -2,8 +2,9 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useRealtime, useRealtimeEvent } from "@/components/realtime/realtime-provider";
-import { api } from "@/lib/client/api";
-import type { ChatDetailDTO, ChatListItemDTO, MessageDTO } from "@/lib/chats/types";
+import { useToast } from "@/components/ui/toast";
+import { api, ClientApiError } from "@/lib/client/api";
+import type { ChatDetailDTO, ChatListItemDTO, ChatSettingsDTO, MessageDTO } from "@/lib/chats/types";
 
 /**
  * In-memory chat list, seeded by the server render and kept fresh by real-time
@@ -16,7 +17,10 @@ type Action =
   | { type: "replace"; chats: ChatListItemDTO[] }
   | { type: "upsert"; chat: ChatListItemDTO }
   | { type: "message"; message: MessageDTO; meId: string; countUnread: boolean }
-  | { type: "read"; chatId: string };
+  | { type: "updated"; message: MessageDTO }
+  | { type: "read"; chatId: string }
+  | { type: "settings"; chatId: string; settings: Partial<ChatSettingsDTO> }
+  | { type: "receipt"; chatId: string; userId: string; lastDeliveredAt: string | null; lastReadAt: string | null };
 
 function sortChats(chats: ChatListItemDTO[]): ChatListItemDTO[] {
   return [...chats].sort(
@@ -24,7 +28,19 @@ function sortChats(chats: ChatListItemDTO[]): ChatListItemDTO[] {
   );
 }
 
+const lastOf = (m: MessageDTO): ChatListItemDTO["lastMessage"] => ({
+  id: m.id,
+  senderId: m.senderId,
+  type: m.type,
+  text: m.text,
+  createdAt: m.createdAt,
+  deleted: m.deleted,
+});
+
 function reducer(state: State, action: Action): State {
+  const map = (id: string, fn: (c: ChatListItemDTO) => ChatListItemDTO) => ({
+    chats: state.chats.map((c) => (c.id === id ? fn(c) : c)),
+  });
   switch (action.type) {
     case "replace":
       return { chats: sortChats(action.chats) };
@@ -41,28 +57,33 @@ function reducer(state: State, action: Action): State {
       const mine = message.senderId === meId;
       const updated: ChatListItemDTO = {
         ...chat,
-        lastMessage: {
-          id: message.id,
-          senderId: message.senderId,
-          type: message.type,
-          text: message.text,
-          createdAt: message.createdAt,
-          deleted: message.deleted,
-        },
+        lastMessage: lastOf(message),
         lastActivityAt: message.createdAt,
         unread: mine ? 0 : chat.unread + (countUnread ? 1 : 0),
         markedUnread: mine ? false : chat.markedUnread,
+        // A new message un-archives the chat unless it's muted (matches the server).
+        archived: mine ? chat.archived : chat.archived && chat.muted,
       };
       return { chats: sortChats(state.chats.map((c) => (c.id === chat.id ? updated : c))) };
     }
+    case "updated":
+      return map(action.message.chatId, (c) => (c.lastMessage?.id === action.message.id ? { ...c, lastMessage: lastOf(action.message) } : c));
     case "read":
-      return {
-        chats: state.chats.map((c) => (c.id === action.chatId ? { ...c, unread: 0, markedUnread: false } : c)),
-      };
+      return map(action.chatId, (c) => ({ ...c, unread: 0, markedUnread: false }));
+    case "settings": {
+      const next = map(action.chatId, (c) => ({ ...c, ...action.settings }));
+      return { chats: sortChats(next.chats) };
+    }
+    case "receipt":
+      return map(action.chatId, (c) =>
+        c.peer?.id === action.userId ? { ...c, peerDeliveredAt: action.lastDeliveredAt, peerReadAt: action.lastReadAt } : c,
+      );
   }
 }
 
 type TypingMap = Record<string, { userId: string; until: number }>;
+
+export type SettingsPatch = { pinned?: boolean; archived?: boolean; markedUnread?: boolean; mute?: "8h" | "1w" | "forever" | "off" };
 
 type Ctx = {
   chats: ChatListItemDTO[];
@@ -72,6 +93,9 @@ type Ctx = {
   applyMessage: (m: MessageDTO, opts?: { countUnread?: boolean }) => void;
   upsertChat: (c: ChatListItemDTO) => void;
   markRead: (chatId: string, upTo: string) => void;
+  /** Pin / archive / mute / mark unread, optimistic with rollback. */
+  updateSettings: (chatId: string, patch: SettingsPatch) => void;
+  refetchChat: (chatId: string) => void;
   typing: TypingMap;
 };
 
@@ -92,6 +116,7 @@ export function useTyping(chatId: string): string | null {
 
 const TYPING_SHOW_MS = 5_000;
 const POLL_LIST_MS = 10_000;
+const DELIVERED_DEBOUNCE_MS = 800;
 
 export function ChatsProvider({
   meId,
@@ -102,6 +127,7 @@ export function ChatsProvider({
   initialChats: ChatListItemDTO[];
   children: React.ReactNode;
 }) {
+  const toast = useToast();
   const [state, dispatch] = useReducer(reducer, { chats: sortChats(initialChats) });
   const [activeChatId, setActiveChat] = useState<string | null>(null);
   const [typing, setTyping] = useState<TypingMap>({});
@@ -120,21 +146,32 @@ export function ChatsProvider({
     dispatch({ type: "replace", chats });
   }, []);
 
-  const fetchChat = useCallback(async (chatId: string) => {
-    const detail = await api<ChatDetailDTO>(`/api/chats/${chatId}`);
-    dispatch({ type: "upsert", chat: detail.chat });
+  const refetchChat = useCallback((chatId: string) => {
+    api<ChatDetailDTO>(`/api/chats/${chatId}`)
+      .then((d) => dispatch({ type: "upsert", chat: d.chat }))
+      .catch(() => {});
+  }, []);
+
+  // Tell the server new messages reached this device (senders see ✓✓), batched.
+  const deliveredTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ackDelivered = useCallback(() => {
+    if (deliveredTimer.current) return;
+    deliveredTimer.current = setTimeout(() => {
+      deliveredTimer.current = null;
+      api("/api/chats/delivered", { method: "POST" }).catch(() => {});
+    }, DELIVERED_DEBOUNCE_MS);
   }, []);
 
   const applyMessage = useCallback(
     (message: MessageDTO, opts?: { countUnread?: boolean }) => {
       if (!chatsRef.current.some((c) => c.id === message.chatId)) {
-        fetchChat(message.chatId).catch(() => {});
+        refetchChat(message.chatId);
         return;
       }
       const viewing = activeRef.current === message.chatId && document.visibilityState === "visible";
       dispatch({ type: "message", message, meId, countUnread: opts?.countUnread ?? !viewing });
     },
-    [fetchChat, meId],
+    [refetchChat, meId],
   );
 
   const markRead = useCallback((chatId: string, upTo: string) => {
@@ -144,20 +181,63 @@ export function ChatsProvider({
 
   const upsertChat = useCallback((chat: ChatListItemDTO) => dispatch({ type: "upsert", chat }), []);
 
+  const updateSettings = useCallback(
+    (chatId: string, patch: SettingsPatch) => {
+      const before = chatsRef.current.find((c) => c.id === chatId);
+      if (!before) return;
+      const optimistic: Partial<ChatSettingsDTO> = {
+        ...(patch.pinned !== undefined && { pinned: patch.pinned }),
+        ...(patch.archived !== undefined && { archived: patch.archived, ...(patch.archived && { pinned: false }) }),
+        ...(patch.markedUnread !== undefined && { markedUnread: patch.markedUnread }),
+        ...(patch.mute !== undefined && { muted: patch.mute !== "off" }),
+      };
+      dispatch({ type: "settings", chatId, settings: optimistic });
+      api<{ settings: ChatSettingsDTO }>(`/api/chats/${chatId}/settings`, { method: "PATCH", body: patch })
+        .then(({ settings }) => dispatch({ type: "settings", chatId, settings }))
+        .catch((err) => {
+          dispatch({
+            type: "settings",
+            chatId,
+            settings: { pinned: before.pinned, archived: before.archived, muted: before.muted, markedUnread: before.markedUnread },
+          });
+          toast(err instanceof ClientApiError ? err.message : "Couldn't update the chat.", "error");
+        });
+    },
+    [toast],
+  );
+
   useRealtimeEvent((e) => {
     switch (e.name) {
-      case "message.new":
-        applyMessage(e.data.message);
-        if (e.data.message.senderId) {
+      case "message.new": {
+        const { message } = e.data;
+        applyMessage(message);
+        if (message.senderId && message.senderId !== meId) {
+          ackDelivered();
           // A message ends that person's "typing…".
-          const { chatId, senderId } = e.data.message;
           setTyping((t) =>
-            t[chatId]?.userId === senderId ? Object.fromEntries(Object.entries(t).filter(([id]) => id !== chatId)) : t,
+            t[message.chatId]?.userId === message.senderId
+              ? Object.fromEntries(Object.entries(t).filter(([id]) => id !== message.chatId))
+              : t,
           );
         }
         break;
+      }
+      case "message.updated":
+        dispatch({ type: "updated", message: e.data.message });
+        break;
+      case "message.hidden":
+        if (chatsRef.current.find((c) => c.id === e.data.chatId)?.lastMessage?.id === e.data.messageId) refetchChat(e.data.chatId);
+        break;
       case "chat.read":
         dispatch({ type: "read", chatId: e.data.chatId });
+        break;
+      case "chat.settings": {
+        const { chatId, ...settings } = e.data;
+        dispatch({ type: "settings", chatId, settings });
+        break;
+      }
+      case "receipt":
+        dispatch({ type: "receipt", ...e.data });
         break;
       case "typing":
         if (e.data.userId !== meId) {
@@ -181,7 +261,7 @@ export function ChatsProvider({
     return () => clearTimeout(t);
   }, [typing]);
 
-  // Polling fallback when real-time is unavailable.
+  // Polling fallback when real-time is unavailable (listing also marks delivery).
   useEffect(() => {
     if (status !== "polling") return;
     const t = setInterval(() => {
@@ -191,8 +271,8 @@ export function ChatsProvider({
   }, [status, refresh]);
 
   const value = useMemo<Ctx>(
-    () => ({ chats: state.chats, activeChatId, setActiveChat, applyMessage, upsertChat, markRead, typing }),
-    [state.chats, activeChatId, applyMessage, upsertChat, markRead, typing],
+    () => ({ chats: state.chats, activeChatId, setActiveChat, applyMessage, upsertChat, markRead, updateSettings, refetchChat, typing }),
+    [state.chats, activeChatId, applyMessage, upsertChat, markRead, updateSettings, refetchChat, typing],
   );
 
   return <ChatsContext value={value}>{children}</ChatsContext>;

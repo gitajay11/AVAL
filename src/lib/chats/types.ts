@@ -2,6 +2,39 @@
 // Dates are ISO strings so they serialize unchanged across every boundary.
 
 export type MessageType = "TEXT" | "IMAGE" | "VIDEO" | "FILE" | "VOICE" | "SYSTEM";
+export type MediaKind = "IMAGE" | "VIDEO" | "FILE" | "VOICE";
+
+export type AttachmentDTO = {
+  id: string;
+  kind: MediaKind;
+  mimeType: string;
+  sizeBytes: number;
+  fileName: string | null;
+  width: number | null;
+  height: number | null;
+  durationMs: number | null;
+  waveform: number[] | null;
+  /** Authorized redirect to a short-lived signed R2 URL. */
+  url: string;
+};
+
+export type LinkPreviewDTO = {
+  url: string;
+  title: string | null;
+  description: string | null;
+  siteName: string | null;
+  imageUrl: string | null;
+};
+
+export type ReplyRefDTO = {
+  id: string;
+  senderId: string | null;
+  type: MessageType;
+  text: string | null; // trimmed snippet
+  deleted: boolean;
+};
+
+export type ReactionDTO = { emoji: string; userIds: string[] };
 
 export type MessageDTO = {
   id: string;
@@ -13,6 +46,14 @@ export type MessageDTO = {
   createdAt: string;
   editedAt: string | null;
   deleted: boolean;
+  attachments: AttachmentDTO[];
+  replyTo: ReplyRefDTO | null;
+  forwardedFromName: string | null;
+  linkPreview: LinkPreviewDTO | null;
+  reactions: ReactionDTO[];
+  pinnedAt: string | null;
+  /** Per viewer: saved to my starred messages. */
+  starred: boolean;
 };
 
 export type PeerDTO = {
@@ -22,18 +63,24 @@ export type PeerDTO = {
   avatarUrl: string | null;
 };
 
+export type LastMessageDTO = Pick<MessageDTO, "id" | "senderId" | "type" | "text" | "createdAt" | "deleted">;
+
 export type ChatListItemDTO = {
   id: string;
   type: "DIRECT" | "GROUP" | "CONTACT";
   title: string;
   avatarUrl: string | null;
   peer: PeerDTO | null; // DIRECT only
-  lastMessage: Pick<MessageDTO, "id" | "senderId" | "type" | "text" | "createdAt" | "deleted"> | null;
+  lastMessage: LastMessageDTO | null;
   lastActivityAt: string;
   unread: number;
   pinned: boolean;
+  archived: boolean;
   muted: boolean;
   markedUnread: boolean;
+  /** DIRECT: the peer's receipt watermarks, for ✓✓ on my last message. */
+  peerDeliveredAt: string | null;
+  peerReadAt: string | null;
 };
 
 export type MessagePage = {
@@ -48,6 +95,8 @@ export type PresenceDTO =
 
 export type UserSearchResultDTO = PeerDTO & { existingChatId: string | null };
 
+export type ReceiptDTO = { userId: string; lastDeliveredAt: string | null; lastReadAt: string | null };
+
 export type ChatDetailDTO = {
   chat: ChatListItemDTO;
   /** Last time I read this chat; drives the "unread messages" divider. */
@@ -55,13 +104,29 @@ export type ChatDetailDTO = {
   /** Whether I may send here (blocks, recipient privacy, unverified email). */
   canSend: boolean;
   cantSendReason: string | null;
+  /** I blocked the other person (offers "Unblock" instead of the composer). */
+  blockedByMe: boolean;
+  /** Other members' delivered/read watermarks. */
+  receipts: ReceiptDTO[];
+  /** Most recently pinned message, if any. */
+  pinned: MessageDTO | null;
   page: MessagePage;
 };
+
+export type ChatSettingsDTO = Pick<ChatListItemDTO, "pinned" | "archived" | "muted" | "markedUnread">;
+
+export type UserProfileDTO = PeerDTO & { bio: string | null; blockedByMe: boolean };
 
 /** Events published by the server to `user:{id}` Ably channels. */
 export type RealtimeEvent =
   | { name: "message.new"; data: { message: MessageDTO } }
+  | { name: "message.updated"; data: { message: MessageDTO } }
+  | { name: "message.hidden"; data: { chatId: string; messageId: string } }
+  | { name: "message.starred"; data: { chatId: string; messageId: string; starred: boolean } }
+  | { name: "reaction"; data: { chatId: string; messageId: string; userId: string; emoji: string | null } }
+  | { name: "receipt"; data: { chatId: string } & ReceiptDTO }
   | { name: "chat.read"; data: { chatId: string; lastReadAt: string } }
+  | { name: "chat.settings"; data: { chatId: string } & ChatSettingsDTO }
   | { name: "typing"; data: { chatId: string; userId: string } }
   | { name: "presence"; data: { userId: string; presence: PresenceDTO } };
 

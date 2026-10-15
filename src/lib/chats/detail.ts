@@ -1,8 +1,9 @@
 import "server-only";
 import type { SessionUser } from "@/lib/auth/session";
-import { getMembership } from "@/lib/authz/chats";
+import { directPeerId, getMembership } from "@/lib/authz/chats";
+import { hasBlocked } from "@/lib/authz/privacy";
 import { db } from "@/lib/db";
-import { getChatItem, listMessagesBefore } from "./queries";
+import { getChatItem, latestPinned, listMessagesBefore } from "./queries";
 import { cantSendReason } from "./service";
 import type { ChatDetailDTO } from "./types";
 
@@ -10,18 +11,31 @@ import type { ChatDetailDTO } from "./types";
 export async function getChatDetail(me: SessionUser, chatId: string): Promise<ChatDetailDTO | null> {
   const m = await getMembership(me.id, chatId);
   if (!m) return null;
-  const [chat, page, receipt, reason] = await Promise.all([
+  const peerId = directPeerId(m, me.id);
+  const [chat, page, receipts, reason, pinned, blockedByMe] = await Promise.all([
     getChatItem(me.id, chatId),
     listMessagesBefore(me.id, chatId, m.clearedAt, null),
-    db.receipt.findUnique({ where: { chatId_userId: { chatId, userId: me.id } }, select: { lastReadAt: true } }),
+    db.receipt.findMany({ where: { chatId }, select: { userId: true, lastDeliveredAt: true, lastReadAt: true } }),
     cantSendReason(me, m),
+    latestPinned(me.id, chatId, m.clearedAt),
+    peerId ? hasBlocked(me.id, peerId) : Promise.resolve(false),
   ]);
   if (!chat) return null;
+  const mine = receipts.find((r) => r.userId === me.id);
   return {
     chat,
-    myLastReadAt: receipt?.lastReadAt?.toISOString() ?? null,
+    myLastReadAt: mine?.lastReadAt?.toISOString() ?? null,
     canSend: reason === null,
     cantSendReason: reason,
+    blockedByMe,
+    receipts: receipts
+      .filter((r) => r.userId !== me.id)
+      .map((r) => ({
+        userId: r.userId,
+        lastDeliveredAt: r.lastDeliveredAt?.toISOString() ?? null,
+        lastReadAt: r.lastReadAt?.toISOString() ?? null,
+      })),
+    pinned,
     page,
   };
 }

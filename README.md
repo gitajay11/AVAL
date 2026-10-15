@@ -2,7 +2,7 @@
 
 A Telegram-style chat PWA. Next.js 16 (App Router) + Tailwind v4 + Motion on Vercel, Neon Postgres via Prisma 7, Ably for real-time, Cloudflare R2 for media, Upstash for rate limiting.
 
-**Status: Phase 2 — 1:1 chat and real-time.** Checklists: [phase 1](docs/phase-1-checklist.md), [phase 2](docs/phase-2-checklist.md).
+**Status: Phase 3 — media, message actions and receipts.** Checklists: [phase 1](docs/phase-1-checklist.md), [phase 2](docs/phase-2-checklist.md), [phase 3](docs/phase-3-checklist.md).
 
 ## Architecture in one screen
 
@@ -14,7 +14,9 @@ A Telegram-style chat PWA. Next.js 16 (App Router) + Tailwind v4 + Motion on Ver
 | Validation | zod everywhere; shared schemas in [src/lib/validation](src/lib/validation). Text is NFC-normalized and stripped of control and bidi-override characters. |
 | Rate limits | [src/lib/security/rate-limit.ts](src/lib/security/rate-limit.ts): login per IP and per identifier, signup, username check, reset, uploads. |
 | Email links | Tokens travel in the URL **fragment** (`#token=`), so they never reach server logs or `Referer`. Single-use, hashed at rest, superseded by newer links. |
-| Media | Presigned PUT that signs exact `Content-Type` + `Content-Length` → confirm step checks size and real file signature → served only via short-lived signed GET behind an authorization check. |
+| Media | Images are downscaled and re-encoded in the browser (strips EXIF/GPS). Upload = presigned PUT that signs exact `Content-Type` + `Content-Length` → confirm checks size and real file signature (images, video, audio) → attach to a message. Reads go through `/api/media/:id`, which checks chat membership, deletion and "delete for me", then redirects to a 1-hour signed URL. Plain files are always served as downloads. Forwarded media share the R2 object; objects are deleted when no attachment references them. |
+| Link previews | Fetched server-side after sending, with an SSRF guard at connect time (every resolved IP checked, private/link-local/metadata ranges refused, ports 80/443 only, redirects re-validated, 512 KB cap, 5 s timeout). The page's image is copied into R2, so browsers never load third-party URLs. |
+| Receipts | Per-member watermarks in `receipts`: *delivered* advances when the chat list loads or a message reaches a device; *read* when the chat is open and scrolled to the bottom. ✓ sent, ✓✓ delivered, green ✓✓ read. |
 | Client storage | None. No localStorage/IndexedDB; the only JS-readable cookie is the theme preference. Logout sends `Clear-Site-Data: "cache"` and empties Cache Storage. |
 | Rendering | Cache Components: each page prerenders a static shell; session-dependent parts stream inside `<Suspense>`. `proxy.ts` only does optimistic redirects. |
 | Real-time | Clients hold an Ably token that can only **subscribe** (and enter presence) on `user:{theirId}`. Every event is published by the server after the API route has authorized it and written it to Postgres, to each recipient's own channel ([src/lib/realtime/server.ts](src/lib/realtime/server.ts)). Without Ably, the client polls. On reconnect it refetches what it missed. |
@@ -54,6 +56,14 @@ pnpm db:seed
 ```
 
 To try two users at once, use a normal and a private window (cookies are per profile).
+
+Media locally: run any S3-compatible server and point `R2_ENDPOINT` at it (it's also added to the CSP in development). For example with [s3rver](https://github.com/jamhall/s3rver) and a CORS file allowing `PUT`/`GET` from `http://localhost:3000`:
+
+```bash
+npx s3rver@3 -d ./.s3 -p 4569 --configure-bucket aval-media ./cors.xml
+```
+
+Then set `R2_ACCOUNT_ID=local`, `R2_ACCESS_KEY_ID=S3RVER`, `R2_SECRET_ACCESS_KEY=S3RVER`, `R2_BUCKET=aval-media` and `R2_ENDPOINT=http://localhost:4569` in `.env`.
 
 Checks:
 
@@ -103,10 +113,12 @@ src/app/(auth)/             login, signup, welcome, verify, forgot/reset
 src/app/(app)/              signed-in shell: chats, settings
 src/app/api/                route handlers (auth, me, uploads, media, cron)
 src/lib/                    server libs: db, env, api helpers, auth, security, r2, mail
-src/lib/chats/              chat queries, services, cursor, timeline, shared types
+src/lib/chats/              chat queries, services, receipts, cursor, timeline, shared types
+src/lib/media/              upload policy, signature sniffing, uploads, ref-counted deletion
+src/lib/link-preview.ts     SSRF-safe preview fetcher (pure parsing in link-meta.ts)
 src/lib/realtime/           Ably token + server-side publishing
 src/lib/client/             browser helpers (fetch wrapper, upload, time, hooks)
-src/components/chats/       chat list, search, conversation, composer, stores
+src/components/chats/       chat list, search, conversation, composer, menus, dialogs, media players
 src/components/realtime/    Ably connection / polling fallback provider
 src/components/             UI kit, auth screens, settings, app shell
 tests/                      vitest unit tests

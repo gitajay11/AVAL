@@ -1,13 +1,15 @@
+import { after } from "next/server";
 import { json, parseJson, route } from "@/lib/api";
 import { requireSession } from "@/lib/auth/session";
 import { listChats } from "@/lib/chats/queries";
-import { startDirectChat } from "@/lib/chats/service";
+import { markAllDelivered, startDirectChat } from "@/lib/chats/service";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { StartChatSchema } from "@/lib/validation/chat";
 
-/** My chat list (pinned first, then most recent activity). */
+/** My chat list (pinned first, then most recent activity). Loading it counts as delivery. */
 export const GET = route(async () => {
   const { user } = await requireSession();
+  after(() => markAllDelivered(user.id));
   return json({ chats: await listChats(user.id) });
 });
 

@@ -50,6 +50,7 @@ enum AttachmentKind {
   VIDEO
   FILE
   VOICE
+  LINK_PREVIEW // og:image of a link preview, copied into R2
 }
 
 enum AttachmentStatus {
@@ -270,7 +271,9 @@ model Attachment {
   messageId  String?          @map("message_id") @db.Uuid
   kind       AttachmentKind
   status     AttachmentStatus @default(PENDING)
-  objectKey  String           @unique @map("object_key")
+  // Not unique: a forwarded message references the same R2 object. Objects are
+  // deleted only when no attachment row points at them any more.
+  objectKey  String           @map("object_key")
   mimeType   String           @map("mime_type") @db.VarChar(127)
   sizeBytes  Int              @map("size_bytes")
   fileName   String?          @map("file_name") @db.VarChar(255)
@@ -284,6 +287,7 @@ model Attachment {
   message  Message? @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   @@index([messageId])
+  @@index([objectKey])
   @@index([status, createdAt])
   @@index([uploaderId, createdAt])
   @@map("attachments")

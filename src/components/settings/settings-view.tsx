@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { ChevronLeft } from "lucide-react";
 import type { Me } from "@/lib/users";
+import { BlockedSection } from "./blocked-section";
 import { AppearanceSection, PrivacyAndNotifications } from "./preferences-sections";
 import { ProfileSection } from "./profile-section";
 import { AccountSection } from "./security-section";
@@ -25,6 +26,7 @@ export function SettingsView({ me: initial }: { me: Me }) {
       <div className="mx-auto flex max-w-2xl flex-col gap-7 px-4 py-6 pb-[max(2rem,env(safe-area-inset-bottom))]">
         <ProfileSection me={me} onChange={setMe} />
         <PrivacyAndNotifications me={me} onChange={setMe} />
+        <BlockedSection />
         <AppearanceSection />
         <AccountSection me={me} />
       </div>

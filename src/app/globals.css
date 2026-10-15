@@ -109,34 +109,36 @@
   --shadow-float: var(--shadow-lg);
 }
 
-/* ───────────── Base ───────────── */
-html {
-  -webkit-tap-highlight-color: transparent;
-  -webkit-text-size-adjust: 100%;
-  text-rendering: optimizeLegibility;
-}
+/* ───────────── Base ─────────────
+   In the base layer so utilities (e.g. focus-visible:outline-none) can override it. */
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
 
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  overscroll-behavior-y: none;
-}
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overscroll-behavior-y: none;
+  }
 
-/* Focus: visible for keyboard users only. */
-:focus:not(:focus-visible) {
-  outline: none;
-}
-:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-  border-radius: 10px;
-}
+  /* Focus: visible for keyboard users only. */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
 
-::selection {
-  background: rgb(16 185 129 / 0.28);
+  ::selection {
+    background: rgb(16 185 129 / 0.28);
+  }
 }
 
 /* ───────────── Utilities ───────────── */
@@ -153,8 +155,8 @@ body {
 
 @utility glass {
   background: var(--glass);
+  /* Standard property only: the CSS build adds the -webkit- prefix for Safari. */
   backdrop-filter: saturate(180%) blur(18px);
-  -webkit-backdrop-filter: saturate(180%) blur(18px);
 }
 
 @utility pt-safe {

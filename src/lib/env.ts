@@ -24,6 +24,8 @@ const EnvSchema = z.object({
   R2_ACCESS_KEY_ID: requiredInProd(z.string().min(1)),
   R2_SECRET_ACCESS_KEY: requiredInProd(z.string().min(1)),
   R2_BUCKET: requiredInProd(z.string().min(1)),
+  // Optional S3-compatible endpoint override (local MinIO/s3rver for development).
+  R2_ENDPOINT: z.url().optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

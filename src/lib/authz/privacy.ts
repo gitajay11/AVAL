@@ -18,6 +18,15 @@ export async function hasMessaged(ownerId: string, viewerId: string): Promise<bo
   return msg !== null;
 }
 
+/** True if `blocker` has blocked `blocked`. */
+export async function hasBlocked(blocker: string, blocked: string): Promise<boolean> {
+  const row = await db.block.findUnique({
+    where: { blockerId_blockedId: { blockerId: blocker, blockedId: blocked } },
+    select: { blockerId: true },
+  });
+  return row !== null;
+}
+
 /** True if either user has blocked the other. */
 export async function isBlockedEitherWay(a: string, b: string): Promise<boolean> {
   const block = await db.block.findFirst({
@@ -77,7 +86,8 @@ export async function canSeeLastSeen(viewerId: string, owner: Pick<Owner, "id" |
  */
 export async function canMessage(senderId: string, recipient: Pick<Owner, "id" | "messageAudience">): Promise<string | null> {
   if (senderId === recipient.id) return null;
-  if (await isBlockedEitherWay(senderId, recipient.id)) return "You can't message this person.";
+  if (await hasBlocked(senderId, recipient.id)) return "You blocked this person.";
+  if (await hasBlocked(recipient.id, senderId)) return "You can't message this person.";
   const allowed = await audienceAllows(
     recipient.messageAudience === "NOBODY" ? "CONTACTS" : recipient.messageAudience,
     false,

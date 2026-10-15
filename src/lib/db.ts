@@ -8,9 +8,12 @@ function createClient() {
   const connectionString = env().DATABASE_URL;
   // Neon in every deployed environment; plain TCP for a local Postgres
   // (`prisma dev`), which the Neon driver can't reach.
-  const adapter = new URL(connectionString).hostname.endsWith(".neon.tech")
+  const url = new URL(connectionString);
+  // `connection_limit` caps the local pool (the `prisma dev` server handles one connection well).
+  const max = Number(url.searchParams.get("connection_limit")) || undefined;
+  const adapter = url.hostname.endsWith(".neon.tech")
     ? new PrismaNeon({ connectionString })
-    : new PrismaPg({ connectionString });
+    : new PrismaPg({ connectionString, max });
   return new PrismaClient({ adapter });
 }
 

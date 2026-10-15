@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { useRef, useState } from "react";
-import { MessageCircleMore, Search, Settings, SquarePen, X } from "lucide-react";
+import { Archive, ChevronLeft, ChevronRight, MessageCircleMore, Search, Settings, SquarePen, Star, X } from "lucide-react";
 import { useUser } from "@/components/app/user-context";
 import { VerifyBanner } from "@/components/app/verify-banner";
 import { useRealtime } from "@/components/realtime/realtime-provider";
@@ -29,25 +29,47 @@ export function ChatSidebar() {
   const pathname = usePathname();
   const { chats, typing } = useChats();
   const [query, setQuery] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const activeId = pathname.startsWith("/chats/") ? pathname.split("/")[2] : null;
   const searching = query.trim().length > 0;
 
   const q = query.trim().replace(/^@/, "").toLowerCase();
+  const archived = chats.filter((c) => c.archived);
+  const archivedUnread = archived.filter((c) => c.unread > 0 || c.markedUnread).length;
   const chatMatches = searching
     ? chats.filter((c) => c.title.toLowerCase().includes(q) || c.peer?.username.toLowerCase().startsWith(q))
-    : chats;
+    : chats.filter((c) => c.archived === showArchived);
+  const listEmpty = !searching && !showArchived && chats.length === 0;
 
   return (
     <>
       <header className="glass sticky top-0 z-10 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2">
         <div className="flex items-center gap-3">
-          <Link href="/settings" className="rounded-full" aria-label="Open settings">
-            <Avatar name={me.displayName} src={me.avatarUrl} size={38} />
-          </Link>
+          {showArchived ? (
+            <button
+              type="button"
+              onClick={() => setShowArchived(false)}
+              className="-ml-1 grid size-10 place-items-center rounded-xl hover:bg-surface-3"
+              aria-label="Back to chats"
+            >
+              <ChevronLeft className="size-6" />
+            </button>
+          ) : (
+            <Link href="/settings" className="rounded-full" aria-label="Open settings">
+              <Avatar name={me.displayName} src={me.avatarUrl} size={38} />
+            </Link>
+          )}
           <h1 className="flex flex-1 items-center gap-2 text-xl font-extrabold tracking-tight">
-            Chats <ConnectionPill />
+            {showArchived ? "Archived" : "Chats"} <ConnectionPill />
           </h1>
+          <Link
+            href="/saved"
+            className="grid size-10 place-items-center rounded-xl text-muted hover:bg-surface-3 hover:text-fg"
+            aria-label="Saved messages"
+          >
+            <Star className="size-5" />
+          </Link>
           <button
             type="button"
             onClick={() => input.current?.focus()}
@@ -98,6 +120,22 @@ export function ChatSidebar() {
         {searching && chatMatches.length > 0 && (
           <h3 className="px-5 pt-3 pb-1.5 text-xs font-bold tracking-wide text-muted uppercase">Chats</h3>
         )}
+        {!searching && !showArchived && archived.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowArchived(true)}
+            className="mx-2 mt-1 flex w-[calc(100%-1rem)] items-center gap-3 rounded-2xl px-2.5 py-2 text-left hover:bg-surface-2"
+          >
+            <span className="grid size-[52px] place-items-center rounded-full bg-surface-3 text-muted">
+              <Archive className="size-6" aria-hidden="true" />
+            </span>
+            <span className="flex-1 text-[15px] font-semibold">Archived chats</span>
+            {archivedUnread > 0 && (
+              <span className="grid h-5 min-w-5 place-items-center rounded-full bg-surface-3 px-1.5 text-[11px] font-bold text-muted">{archivedUnread}</span>
+            )}
+            <ChevronRight className="size-5 text-subtle" aria-hidden="true" />
+          </button>
+        )}
         <ul className="flex flex-col gap-0.5 py-1">
           <AnimatePresence initial={false}>
             {chatMatches.map((chat) => (
@@ -114,7 +152,11 @@ export function ChatSidebar() {
 
         {searching && <PeopleResults query={query} onOpened={() => setQuery("")} />}
 
-        {!searching && chats.length === 0 && (
+        {showArchived && !searching && archived.length === 0 && (
+          <p className="px-6 py-10 text-center text-[15px] text-muted">No archived chats. Swipe a chat or right-click it to archive.</p>
+        )}
+
+        {listEmpty && (
           <div className="flex flex-col items-center gap-4 px-8 pt-16 text-center">
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}

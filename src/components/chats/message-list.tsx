@@ -4,19 +4,20 @@ import { forwardRef, memo } from "react";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { Spinner } from "@/components/ui/spinner";
 import { ClientTime, formatDay } from "@/lib/client/time";
-import type { TimelineItem } from "@/lib/chats/timeline";
+import type { TimelineItem, UiMessage } from "@/lib/chats/timeline";
 import { CHAT_HEADER_HEIGHT } from "./chat-header";
-import { MessageBubble } from "./message-bubble";
+import { MessageBubble, type Receipt } from "./message-bubble";
 
 type ListContext = {
   loadingOlder: boolean;
   reachedStart: boolean;
   footerHeight: number;
+  headerExtra: number;
 };
 
 function Header({ context }: { context?: ListContext }) {
   return (
-    <div style={{ paddingTop: `calc(${CHAT_HEADER_HEIGHT}px + env(safe-area-inset-top))` }}>
+    <div style={{ paddingTop: `calc(${CHAT_HEADER_HEIGHT + (context?.headerExtra ?? 0)}px + env(safe-area-inset-top))` }}>
       <div className="flex h-12 items-center justify-center">
         {context?.loadingOlder ? (
           <Spinner className="size-5 text-subtle" />
@@ -62,10 +63,12 @@ type Props = {
   loadingOlder: boolean;
   reachedStart: boolean;
   footerHeight: number;
+  highlightedId: string | null;
+  headerExtra: number;
+  receiptFor: (m: UiMessage) => Receipt;
   shouldAnimate: (key: string) => boolean;
   onStartReached: () => void;
   onAtBottomChange: (atBottom: boolean) => void;
-  onRetry: (clientId: string) => void;
 };
 
 /**
@@ -73,7 +76,7 @@ type Props = {
  * prepended by lowering `firstItemIndex`, which keeps the scroll position fixed.
  */
 export const MessageList = forwardRef<VirtuosoHandle, Props>(function MessageList(
-  { items, firstItemIndex, initialIndex, meId, loadingOlder, reachedStart, footerHeight, shouldAnimate, onStartReached, onAtBottomChange, onRetry },
+  { items, firstItemIndex, initialIndex, meId, loadingOlder, reachedStart, footerHeight, highlightedId, headerExtra, receiptFor, shouldAnimate, onStartReached, onAtBottomChange },
   ref,
 ) {
   return (
@@ -90,7 +93,7 @@ export const MessageList = forwardRef<VirtuosoHandle, Props>(function MessageLis
       atBottomStateChange={onAtBottomChange}
       startReached={onStartReached}
       increaseViewportBy={{ top: 800, bottom: 400 }}
-      context={{ loadingOlder, reachedStart, footerHeight }}
+      context={{ loadingOlder, reachedStart, footerHeight, headerExtra }}
       components={{ Header, Footer }}
       itemContent={(_, item) => {
         if (item.kind === "day") return <DaySeparator iso={item.iso} />;
@@ -102,7 +105,8 @@ export const MessageList = forwardRef<VirtuosoHandle, Props>(function MessageLis
             groupStart={item.groupStart}
             groupEnd={item.groupEnd}
             animate={shouldAnimate(item.key)}
-            onRetry={onRetry}
+            receipt={receiptFor(item.message)}
+            highlighted={item.message.id === highlightedId}
           />
         );
       }}

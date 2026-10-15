@@ -18,6 +18,13 @@ function msg(over: Partial<UiMessage> & { createdAt: string }): UiMessage {
     text: `m${seq}`,
     editedAt: null,
     deleted: false,
+    attachments: [],
+    replyTo: null,
+    forwardedFromName: null,
+    linkPreview: null,
+    reactions: [],
+    pinnedAt: null,
+    starred: false,
     status: "sent",
     ...over,
   };

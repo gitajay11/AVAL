@@ -26,6 +26,11 @@ export const RULES = {
   presenceRead: { limit: 120, window: "1 m" },
   presencePing: { limit: 10, window: "1 m" },
   realtimeToken: { limit: 30, window: "10 m" },
+  mediaUpload: { limit: 60, window: "10 m" },
+  messageAction: { limit: 120, window: "1 m" },
+  forward: { limit: 20, window: "10 m" },
+  block: { limit: 30, window: "1 h" },
+  report: { limit: 10, window: "1 d" },
 } satisfies Record<string, Rule>;
 
 export type RuleName = keyof typeof RULES;
@@ -88,5 +93,6 @@ export async function rateLimit(name: RuleName, key: string): Promise<void> {
 
 function formatWait(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
-  return `${Math.ceil(seconds / 60)} min`;
+  if (seconds < 3600) return `${Math.ceil(seconds / 60)} min`;
+  return `${Math.ceil(seconds / 3600)} h`;
 }

@@ -26,7 +26,7 @@ export const GET = route<RouteContext<"/api/media/avatar/[userId]">>(async (_req
     throw new ApiError(404, "not_found", "Not found.");
   }
 
-  const url = await presignDownload(owner.avatarKey, SIGNED_URL_TTL);
+  const url = await presignDownload(owner.avatarKey, { expiresIn: SIGNED_URL_TTL });
   return NextResponse.redirect(url, {
     status: 302,
     headers: { "Cache-Control": "private, max-age=600" },

@@ -45,3 +45,39 @@ export async function chatAudience(chatId: string): Promise<string[]> {
   const members = await db.chatMember.findMany({ where: { chatId }, select: { userId: true } });
   return members.map((m) => m.userId);
 }
+
+/**
+ * A message the caller may act on: they're a member of its chat and haven't
+ * hidden it or cleared it away. Otherwise 404, indistinguishable from missing.
+ */
+export async function requireMessage(userId: string, messageId: string) {
+  const id = uuid.safeParse(messageId);
+  const message = id.success
+    ? await db.message.findUnique({
+        where: { id: id.data },
+        select: {
+          id: true,
+          chatId: true,
+          senderId: true,
+          type: true,
+          text: true,
+          createdAt: true,
+          deletedAt: true,
+          pinnedAt: true,
+          forwardedFromName: true,
+          linkPreview: true,
+          hiddenFor: { where: { userId }, select: { userId: true } },
+        },
+      })
+    : null;
+  const membership = message ? await getMembership(userId, message.chatId) : null;
+  if (
+    !message ||
+    !membership ||
+    message.hiddenFor.length > 0 ||
+    (membership.clearedAt && message.createdAt <= membership.clearedAt)
+  ) {
+    throw new ApiError(404, "not_found", "Message not found.");
+  }
+  return { message, membership };
+}

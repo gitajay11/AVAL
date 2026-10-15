@@ -20,7 +20,8 @@ function s3(): S3Client {
   }
   client = new S3Client({
     region: "auto",
-    endpoint: `https://${e.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    endpoint: e.R2_ENDPOINT ?? `https://${e.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    forcePathStyle: Boolean(e.R2_ENDPOINT),
     credentials: { accessKeyId: e.R2_ACCESS_KEY_ID, secretAccessKey: e.R2_SECRET_ACCESS_KEY },
     // Don't add CRC32 checksum headers the browser upload wouldn't send.
     requestChecksumCalculation: "WHEN_REQUIRED",
@@ -46,19 +47,32 @@ export async function presignUpload(key: string, contentType: string, contentLen
   return { url, headers: { "Content-Type": contentType } };
 }
 
-/** Short-lived signed GET. Media is never public. */
-export function presignDownload(key: string, expiresIn = 60 * 60, downloadName?: string) {
+/**
+ * Short-lived signed GET. Media is never public. `contentType`/`downloadName`
+ * override what R2 sends, so arbitrary uploaded files are served as downloads.
+ */
+export function presignDownload(
+  key: string,
+  opts: { expiresIn?: number; downloadName?: string; contentType?: string } = {},
+) {
+  const { expiresIn = 60 * 60, downloadName, contentType } = opts;
   return getSignedUrl(
     s3(),
     new GetObjectCommand({
       Bucket: bucket(),
       Key: key,
+      ...(contentType ? { ResponseContentType: contentType } : {}),
       ...(downloadName
         ? { ResponseContentDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(downloadName)}` }
         : {}),
     }),
     { expiresIn },
   );
+}
+
+/** Server-side upload (e.g. link-preview images fetched by the server). */
+export async function putObject(key: string, body: Uint8Array, contentType: string) {
+  await s3().send(new PutObjectCommand({ Bucket: bucket(), Key: key, Body: body, ContentType: contentType }));
 }
 
 export async function headObject(key: string): Promise<{ size: number; contentType?: string } | null> {

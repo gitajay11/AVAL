@@ -2,7 +2,11 @@ import { dayKey } from "@/lib/dates";
 import type { MessageDTO } from "./types";
 
 /** A message as the chat screen holds it: confirmed, or optimistic and in flight. */
-export type UiMessage = MessageDTO & { status: "sent" | "sending" | "failed" };
+export type UiMessage = MessageDTO & {
+  status: "sent" | "sending" | "failed";
+  /** 0–1 while an attachment is uploading (optimistic messages only). */
+  upload?: number;
+};
 
 export type TimelineItem =
   | { kind: "day"; key: string; iso: string }

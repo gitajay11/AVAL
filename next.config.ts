@@ -5,7 +5,10 @@ const isDev = process.env.NODE_ENV !== "production";
 // Static CSP (no nonces) so pages keep their prerendered static shells. Inline
 // scripts are Next's own bootstrap; user content is never rendered as HTML.
 // connect/img/media allow R2 (presigned uploads, signed reads) and Ably (real-time).
-const R2 = "https://*.r2.cloudflarestorage.com";
+// Plus the optional S3-compatible endpoint used for local development.
+const R2 = ["https://*.r2.cloudflarestorage.com", process.env.R2_ENDPOINT ? new URL(process.env.R2_ENDPOINT).origin : ""]
+  .filter(Boolean)
+  .join(" ");
 // Ably real-time endpoints and fallback hosts.
 const ABLY = "https://*.ably.io wss://*.ably.io https://*.ably.net wss://*.ably.net https://*.ably-realtime.com wss://*.ably-realtime.com";
 const csp = [
