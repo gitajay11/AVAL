@@ -16,7 +16,8 @@ export const UpdateSettingsSchema = z
   .object({
     lastSeenAudience: audience,
     avatarAudience: audience,
-    messageAudience: audience,
+    // "Nobody" isn't offered for messages: existing conversations must keep working.
+    messageAudience: z.enum(["EVERYONE", "CONTACTS"]),
     notifyMessages: z.boolean(),
     notifyPreviews: z.boolean(),
     notifyAccessRequests: z.boolean(),

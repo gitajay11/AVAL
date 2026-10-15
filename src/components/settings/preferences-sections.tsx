@@ -15,7 +15,7 @@ type Settings = Me["privacy"] & Me["notifications"];
 
 const AUDIENCE_OPTIONS: { value: Audience; label: string }[] = [
   { value: "EVERYONE", label: "Everyone" },
-  { value: "CONTACTS", label: "My chats" },
+  { value: "CONTACTS", label: "My contacts" },
   { value: "NOBODY", label: "Nobody" },
 ];
 
@@ -42,7 +42,7 @@ export function PrivacyAndNotifications({ me, onChange }: { me: Me; onChange: (m
   const { values, update } = useSettings(me, onChange);
   return (
     <>
-      <Section id="privacy" title="Privacy" description="“My chats” means people you already have a 1:1 chat with.">
+      <Section id="privacy" title="Privacy" description="“My contacts” means people you've sent a message to.">
         <Segmented
           label="Last seen & online"
           value={values.lastSeenAudience}
@@ -60,7 +60,7 @@ export function PrivacyAndNotifications({ me, onChange }: { me: Me; onChange: (m
         <Segmented
           label="Who can message me"
           value={values.messageAudience}
-          options={AUDIENCE_OPTIONS}
+          options={AUDIENCE_OPTIONS.filter((o) => o.value !== "NOBODY")}
           onChange={(v) => update("messageAudience", v)}
         />
       </Section>

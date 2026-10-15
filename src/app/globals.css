@@ -179,6 +179,14 @@ body {
     var(--bg);
 }
 
+/* Conversation backdrop: a quiet wash of the brand colours behind the bubbles. */
+@utility bg-chat {
+  background:
+    radial-gradient(40rem 30rem at 0% 0%, rgb(29 78 216 / 0.07), transparent 60%),
+    radial-gradient(40rem 30rem at 100% 100%, rgb(15 118 110 / 0.08), transparent 60%),
+    var(--bg);
+}
+
 @keyframes shimmer {
   100% {
     transform: translateX(100%);

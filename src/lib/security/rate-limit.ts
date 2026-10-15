@@ -19,6 +19,13 @@ export const RULES = {
   changePassword: { limit: 5, window: "15 m" },
   avatarUpload: { limit: 20, window: "1 h" },
   profileUpdate: { limit: 30, window: "10 m" },
+  userSearch: { limit: 40, window: "1 m" },
+  chatCreate: { limit: 20, window: "10 m" },
+  messageSend: { limit: 60, window: "1 m" },
+  typing: { limit: 60, window: "1 m" },
+  presenceRead: { limit: 120, window: "1 m" },
+  presencePing: { limit: 10, window: "1 m" },
+  realtimeToken: { limit: 30, window: "10 m" },
 } satisfies Record<string, Rule>;
 
 export type RuleName = keyof typeof RULES;
