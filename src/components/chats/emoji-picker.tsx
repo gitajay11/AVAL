@@ -40,7 +40,7 @@ export function EmojiPicker({ open, onPick, onClose }: { open: boolean; onPick: 
           exit={{ opacity: 0, y: 6, scale: 0.98 }}
           transition={{ type: "spring", stiffness: 520, damping: 36 }}
           style={{ transformOrigin: "bottom left" }}
-          className="glass absolute bottom-full left-2 mb-2 w-[min(340px,calc(100vw-1rem))] rounded-[20px] border border-line p-2 shadow-float"
+          className="glass-3 absolute bottom-full left-2 mb-2 w-[min(340px,calc(100vw-1rem))] rounded-[20px] p-2"
         >
           <div className="grid grid-cols-8 gap-0.5">
             {EMOJI.map((e) => (

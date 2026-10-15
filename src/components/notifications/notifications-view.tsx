@@ -77,7 +77,7 @@ export function NotificationsView() {
             <article
               key={n.id}
               className={cn(
-                "flex gap-3 rounded-[20px] border border-line bg-surface p-4 shadow-[var(--shadow-sm)]",
+                "glass-1 flex gap-3 rounded-[20px] p-4",
                 unreadIds?.has(n.id) && "border-accent/40 bg-accent-soft",
               )}
             >

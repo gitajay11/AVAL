@@ -19,7 +19,7 @@ export function Section({
         {title}
       </h2>
       {description && <p className="mt-0.5 px-1 text-[13px] text-subtle">{description}</p>}
-      <div className={cn("mt-2.5 rounded-[20px] border border-line bg-surface px-4 py-2 shadow-[var(--shadow-sm)] sm:px-5", className)}>
+      <div className={cn("glass-1 mt-2.5 rounded-[20px] px-4 py-2 sm:px-5", className)}>
         {children}
       </div>
     </section>

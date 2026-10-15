@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "Chats" };
 /** Desktop right pane when no chat is open (the list lives in the shell). */
 export default function ChatsPage() {
   return (
-    <div className="bg-aurora flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
+    <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
       <LogoMark className="size-16 opacity-90" />
       <div>
         <p className="text-lg font-bold">Select a chat to start messaging</p>

@@ -97,7 +97,7 @@ type HeaderProps = {
 
 export function ChatHeader({ chat, readOnly, nameOf, onSearch, pinned, onOpenProfile, onJumpToPinned, onUnpin }: HeaderProps) {
   return (
-    <header className="glass absolute inset-x-0 top-0 z-20 border-b border-line pt-[env(safe-area-inset-top)]">
+    <header className="glass-2 absolute inset-x-0 top-0 z-20 pt-[env(safe-area-inset-top)]">
       <div className="flex h-16 items-center gap-2 px-2 sm:px-4">
         <Link
           href="/chats"

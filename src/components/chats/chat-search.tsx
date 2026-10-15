@@ -97,7 +97,7 @@ export function ChatSearch({
           aria-label="Search in chat"
           onKeyDown={(e) => e.key === "Escape" && onClose()}
         >
-          <div className="glass flex items-center gap-2 border-b border-line px-2 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 sm:px-4">
+          <div className="glass-2 glass-flat flex items-center gap-2 px-2 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 sm:px-4">
             <button type="button" onClick={onClose} className="grid size-10 place-items-center rounded-xl hover:bg-surface-3" aria-label="Close search">
               <ArrowLeft className="size-5" />
             </button>
@@ -109,7 +109,7 @@ export function ChatSearch({
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Search messages"
-                className="h-11 w-full rounded-2xl bg-surface-3 pr-10 pl-10 text-[15px] placeholder:text-subtle focus-visible:ring-4 focus-visible:ring-ring/20 focus-visible:outline-none"
+                className="h-11 w-full rounded-2xl glass-input pr-10 pl-10 text-[15px] placeholder:text-subtle"
               />
               {q && (
                 <button type="button" onClick={() => setQ("")} className="absolute top-1/2 right-2 grid size-7 -translate-y-1/2 place-items-center rounded-full text-subtle hover:bg-surface-2" aria-label="Clear">

@@ -9,8 +9,8 @@ type Variant = "primary" | "secondary" | "ghost" | "danger" | "outline";
 type Size = "sm" | "md" | "lg" | "icon";
 
 const variants: Record<Variant, string> = {
-  primary: "bg-brand text-white shadow-[0_8px_20px_-8px_rgb(29_78_216/0.6)] hover:brightness-110",
-  secondary: "bg-surface-3 text-fg hover:bg-line-strong/60",
+  primary: "glass-primary",
+  secondary: "glass-1 glass-focus text-fg hover:bg-[var(--glass-1-hover)]",
   ghost: "text-fg hover:bg-surface-3",
   outline: "border border-line-strong text-fg hover:bg-surface-2",
   danger: "bg-danger-soft text-danger hover:bg-danger/15",
@@ -43,7 +43,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={cn(
-        "relative inline-flex select-none items-center justify-center font-semibold transition-[background,filter,color,opacity] duration-150",
+        "relative inline-flex select-none items-center justify-center font-semibold transition-[background,filter,color,opacity,box-shadow] duration-150",
         "disabled:cursor-not-allowed disabled:opacity-55",
         variants[variant],
         sizes[size],

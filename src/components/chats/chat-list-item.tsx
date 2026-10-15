@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { animate, motion, useMotionValue } from "motion/react";
+import { animate, motion, useMotionValue, useTransform } from "motion/react";
 import { useState, useSyncExternalStore } from "react";
 import { Archive, ArchiveRestore, Bell, BellOff, Check, CheckCheck, Mail, MailOpen, Pin, PinOff } from "lucide-react";
 import { ActionMenu, useLongPress, type MenuItem } from "@/components/ui/action-menu";
@@ -54,6 +54,8 @@ export function ChatListItem({ chat, meId, active, typing }: { chat: ChatListIte
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const unread = chat.unread > 0 || chat.markedUnread;
   const longPress = useLongPress(setMenu);
+  // The card is see-through glass, so the swipe actions only show while it moves.
+  const actionsOpacity = useTransform(x, (v) => (v === 0 ? 0 : 1));
 
   const close = () => animate(x, 0, { type: "spring", stiffness: 500, damping: 40 });
   const run = (fn: () => void) => () => {
@@ -78,7 +80,7 @@ export function ChatListItem({ chat, meId, active, typing }: { chat: ChatListIte
   return (
     <motion.li layout="position" transition={{ type: "spring", stiffness: 500, damping: 40 }} className="relative mx-2 overflow-hidden rounded-2xl">
       {touch && (
-        <div className="absolute inset-0 flex justify-between" aria-hidden="true">
+        <motion.div className="absolute inset-0 flex justify-between" style={{ opacity: actionsOpacity }} aria-hidden="true">
           <div className="flex">
             <button type="button" tabIndex={-1} className={cn(swipeBtn, "bg-[#0f766e]")} onClick={run(() => updateSettings(chat.id, { pinned: !chat.pinned }))}>
               {chat.pinned ? <PinOff className="size-5" /> : <Pin className="size-5" />}
@@ -99,7 +101,7 @@ export function ChatListItem({ chat, meId, active, typing }: { chat: ChatListIte
               {chat.archived ? "Restore" : "Archive"}
             </button>
           </div>
-        </div>
+        </motion.div>
       )}
       <motion.div
         style={{ x, touchAction: "pan-y" }}
@@ -111,7 +113,7 @@ export function ChatListItem({ chat, meId, active, typing }: { chat: ChatListIte
           const offset = x.get() + info.velocity.x * 0.15;
           animate(x, offset < -ACTION_W ? -OPEN : offset > ACTION_W ? OPEN : 0, { type: "spring", stiffness: 500, damping: 40 });
         }}
-        className="relative bg-surface"
+        className="glass-1 glass-sheen rounded-2xl"
       >
         <Link
           href={`/chats/${chat.id}`}
@@ -125,8 +127,8 @@ export function ChatListItem({ chat, meId, active, typing }: { chat: ChatListIte
             }
           }}
           className={cn(
-            "flex items-center gap-3 rounded-2xl px-2.5 py-2.5 transition-colors",
-            active ? "bg-brand text-white" : "hover:bg-surface-2 active:bg-surface-3",
+            "relative z-[1] flex items-center gap-3 rounded-2xl px-2.5 py-2.5 transition-transform active:scale-[0.97]",
+            active && "glass-primary text-white",
           )}
           {...longPress}
         >

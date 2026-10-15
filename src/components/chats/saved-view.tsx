@@ -60,7 +60,7 @@ export function SavedView({ initial, initialCursor }: { initial: StarredItem[]; 
               key={i.message.id}
               layout
               exit={{ opacity: 0, height: 0 }}
-              className="rounded-[20px] border border-line bg-surface p-4 shadow-[var(--shadow-sm)]"
+              className="glass-1 rounded-[20px] p-4"
             >
               <div className="mb-1.5 flex items-center gap-2 text-sm">
                 <Link href={`/chats/${i.chat.id}`} className="font-semibold text-accent hover:underline">

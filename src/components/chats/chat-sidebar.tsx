@@ -42,6 +42,14 @@ export function ChatSidebar() {
   const input = useRef<HTMLInputElement>(null);
   const activeId = pathname.startsWith("/chats/") ? pathname.split("/")[2] : null;
   const searching = query.trim().length > 0;
+  // The section you're in shows as a glowing gradient-glass capsule.
+  const navProps = (href: string, base: string) => {
+    const active = pathname === href || pathname.startsWith(`${href}/`);
+    return {
+      "aria-current": active ? ("page" as const) : undefined,
+      className: cn(base, active && "glass-primary text-white hover:bg-transparent hover:text-white"),
+    };
+  };
 
   const q = query.trim().replace(/^@/, "").toLowerCase();
   const archived = chats.filter((c) => c.archived);
@@ -53,7 +61,7 @@ export function ChatSidebar() {
 
   return (
     <>
-      <header className="glass sticky top-0 z-10 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2">
+      <header className="glass-2 sticky top-0 z-10 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2">
         <div className="flex items-center gap-3">
           {showArchived ? (
             <button
@@ -74,7 +82,7 @@ export function ChatSidebar() {
           </h1>
           <Link
             href="/notifications"
-            className="relative grid size-10 place-items-center rounded-xl text-muted hover:bg-surface-3 hover:text-fg"
+            {...navProps("/notifications", "relative grid size-10 place-items-center rounded-xl text-muted hover:bg-surface-3 hover:text-fg")}
             aria-label={unreadNotifications ? `Notifications, ${unreadNotifications} new` : "Notifications"}
           >
             <Bell className="size-5" />
@@ -86,14 +94,14 @@ export function ChatSidebar() {
           </Link>
           <Link
             href="/contacts"
-            className="grid size-10 place-items-center rounded-xl text-muted hover:bg-surface-3 hover:text-fg"
+            {...navProps("/contacts", "grid size-10 place-items-center rounded-xl text-muted hover:bg-surface-3 hover:text-fg")}
             aria-label="Contacts"
           >
             <BookUser className="size-5" />
           </Link>
           <Link
             href="/saved"
-            className="grid size-10 place-items-center rounded-xl text-muted hover:bg-surface-3 hover:text-fg"
+            {...navProps("/saved", "grid size-10 place-items-center rounded-xl text-muted hover:bg-surface-3 hover:text-fg")}
             aria-label="Starred messages"
           >
             <Star className="size-5" />
@@ -134,7 +142,7 @@ export function ChatSidebar() {
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
-            className="h-11 w-full rounded-2xl bg-surface-3 pr-10 pl-10 text-[15px] placeholder:text-subtle focus-visible:ring-4 focus-visible:ring-ring/20 focus-visible:outline-none [&::-webkit-search-cancel-button]:hidden"
+            className="h-11 w-full rounded-2xl glass-input pr-10 pl-10 text-[15px] placeholder:text-subtle [&::-webkit-search-cancel-button]:hidden"
           />
           {searching && (
             <button
@@ -172,7 +180,7 @@ export function ChatSidebar() {
             <ChevronRight className="size-5 text-subtle" aria-hidden="true" />
           </button>
         )}
-        <ul className="flex flex-col gap-0.5 py-1">
+        <ul className="flex flex-col gap-1.5 py-1.5">
           <AnimatePresence initial={false}>
             {chatMatches.map((chat) => (
               <ChatListItem
@@ -211,7 +219,7 @@ export function ChatSidebar() {
             <button
               type="button"
               onClick={() => input.current?.focus()}
-              className={cn("rounded-2xl bg-brand px-5 py-2.5 text-[15px] font-semibold text-white")}
+              className="glass-primary rounded-2xl px-5 py-2.5 text-[15px] font-semibold transition-transform active:scale-[0.97]"
             >
               Find people
             </button>

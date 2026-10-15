@@ -20,7 +20,7 @@ export function AuthCard({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: "spring", stiffness: 260, damping: 26 }}
     >
-      <section className="glass rounded-[24px] border border-line p-6 shadow-float sm:p-8">
+      <section className="glass-2 rounded-[24px] p-6 sm:p-8">
         <h1 className="text-2xl font-extrabold tracking-tight text-fg">{title}</h1>
         {subtitle && <p className="mt-1.5 text-[15px] text-muted">{subtitle}</p>}
         <div className="mt-6">{children}</div>

@@ -67,7 +67,7 @@ export function Sheet({ open, onClose, title, description, children, variant = "
       {open && (
         <div className={cn("fixed inset-0 z-50 flex justify-center", variant === "sheet" ? "items-end sm:items-center" : "items-center p-4")}>
           <motion.div
-            className="absolute inset-0 bg-black/45 backdrop-blur-[2px]"
+            className="absolute inset-0 bg-[var(--scrim)] backdrop-blur-md"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -85,7 +85,7 @@ export function Sheet({ open, onClose, title, description, children, variant = "
             exit={variant === "sheet" ? { y: "100%", opacity: 0.6 } : { scale: 0.97, opacity: 0 }}
             transition={{ type: "spring", stiffness: 420, damping: 38 }}
             className={cn(
-              "relative z-10 flex max-h-[88dvh] w-full flex-col overflow-hidden border border-line bg-surface shadow-float focus:outline-none",
+              "glass-3 glass-flat z-10 flex max-h-[88dvh] w-full flex-col overflow-hidden focus:outline-none",
               variant === "sheet"
                 ? "rounded-t-[24px] pb-[env(safe-area-inset-bottom)] sm:max-w-md sm:rounded-[24px] sm:pb-0"
                 : "max-w-sm rounded-[24px]",

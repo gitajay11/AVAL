@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
+import { Backdrop } from "@/components/app/backdrop";
 import { installScript } from "@/components/app/pwa";
 import { Providers } from "@/components/providers";
 import { themeScript } from "@/components/theme";
@@ -25,8 +26,8 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#eef3f8" },
-    { media: "(prefers-color-scheme: dark)", color: "#050d18" },
+    { media: "(prefers-color-scheme: light)", color: "#eef6f4" },
+    { media: "(prefers-color-scheme: dark)", color: "#07141a" },
   ],
 };
 
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: themeScript + installScript }} />
       </head>
       <body className="min-h-dvh">
+        <Backdrop />
         <Providers>{children}</Providers>
       </body>
     </html>

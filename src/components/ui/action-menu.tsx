@@ -84,7 +84,7 @@ export function ActionMenu({ anchor, onClose, items, header, label }: Props) {
           exit={{ opacity: 0, scale: 0.95 }}
           transition={{ type: "spring", stiffness: 600, damping: 36 }}
           style={{ left: pos?.left ?? anchor.x, top: pos?.top ?? anchor.y, transformOrigin: "top left" }}
-          className="glass fixed z-50 min-w-52 overflow-hidden rounded-[18px] border border-line p-1.5 shadow-float"
+          className="glass-3 fixed z-50 min-w-52 overflow-hidden rounded-[18px] p-1.5"
           onContextMenu={(e) => e.preventDefault()}
         >
           {header}

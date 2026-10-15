@@ -136,7 +136,7 @@ export function GroupInfoSheet({
             )}
           </div>
           {adding && (
-            <div className="mt-2 flex flex-col gap-2 rounded-2xl border border-line p-3">
+            <div className="glass-1 mt-2 flex flex-col gap-2 rounded-2xl p-3">
               <PeoplePicker picked={picked} onChange={setPicked} exclude={members.map((m) => m.id)} />
               <div className="flex justify-end gap-2">
                 <Button size="sm" variant="ghost" onClick={() => setAdding(false)}>

@@ -24,7 +24,7 @@ function Header({ context }: { context?: ListContext }) {
         {context?.loadingOlder ? (
           <Spinner className="size-5 text-subtle" />
         ) : context?.reachedStart ? (
-          <span className="rounded-full bg-surface/80 px-3 py-1 text-xs font-medium text-muted shadow-[var(--shadow-sm)]">
+          <span className="glass-1 rounded-full px-3 py-1 text-xs font-medium text-muted">
             This is the start of your conversation
           </span>
         ) : null}
@@ -44,7 +44,7 @@ function Footer({ context }: { context?: ListContext }) {
 const DaySeparator = memo(function DaySeparator({ iso }: { iso: string }) {
   return (
     <div className="sticky top-0 flex justify-center py-2">
-      <span className="glass rounded-full border border-line px-3 py-1 text-xs font-semibold text-muted shadow-[var(--shadow-sm)]">
+      <span className="glass-1 rounded-full px-3 py-1 text-xs font-semibold text-muted">
         <ClientTime iso={iso} format={formatDay} />
       </span>
     </div>

@@ -35,10 +35,10 @@ export function AppShell({
         <ChatsProvider meId={user.id} initialChats={initialChats}>
           <NotificationsProvider>
           <LightboxProvider>
-          <div className="flex h-dvh overflow-hidden bg-bg pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
+          <div className="flex h-dvh overflow-hidden pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
             <aside
               className={cn(
-                "flex w-full flex-col border-line bg-surface md:w-[360px] md:shrink-0 md:border-r lg:w-[400px]",
+                "flex w-full flex-col border-line bg-glass shadow-[var(--glass-highlight)] md:w-[360px] md:shrink-0 md:border-r lg:w-[400px]",
                 !listRoute && "hidden md:flex",
               )}
             >
@@ -70,8 +70,8 @@ export function AppShell({
 
 export function AppShellSkeleton() {
   return (
-    <div className="flex h-dvh bg-bg" aria-busy="true" aria-label="Loading">
-      <aside className="flex w-full flex-col gap-3 bg-surface p-4 md:w-[360px] md:border-r md:border-line lg:w-[400px]">
+    <div className="flex h-dvh" aria-busy="true" aria-label="Loading">
+      <aside className="flex w-full flex-col gap-3 bg-glass p-4 md:w-[360px] md:border-r md:border-line lg:w-[400px]">
         <div className="flex items-center gap-3">
           <div className="size-[38px] rounded-full bg-surface-3" />
           <div className="h-5 w-24 rounded-lg bg-surface-3" />

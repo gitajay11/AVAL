@@ -3,7 +3,7 @@ import { LogoMark } from "@/components/ui/logo";
 
 export default function NotFound() {
   return (
-    <div className="bg-aurora flex h-full min-h-dvh flex-col items-center justify-center gap-4 p-8 text-center">
+    <div className="flex h-full min-h-dvh flex-col items-center justify-center gap-4 p-8 text-center">
       <LogoMark className="size-14" />
       <div>
         <h1 className="text-xl font-extrabold">Nothing here</h1>

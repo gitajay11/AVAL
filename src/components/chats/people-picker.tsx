@@ -72,7 +72,7 @@ export function PeoplePicker({
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}
-          className="h-10 w-full rounded-xl bg-surface-3 pr-3 pl-9 text-[15px] placeholder:text-subtle focus-visible:ring-4 focus-visible:ring-ring/20 focus-visible:outline-none"
+          className="h-10 w-full rounded-xl glass-input pr-3 pl-9 text-[15px] placeholder:text-subtle"
         />
       </label>
       <ul className="-mx-2 flex max-h-[32dvh] flex-col overflow-y-auto">

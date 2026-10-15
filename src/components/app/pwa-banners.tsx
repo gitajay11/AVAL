@@ -56,7 +56,7 @@ export function InstallBanner() {
             transition={{ type: "spring", stiffness: 400, damping: 38 }}
             className="overflow-hidden"
           >
-            <div className="mx-3 mt-2 mb-1 flex items-center gap-3 rounded-2xl border border-line bg-surface-2 p-3">
+            <div className="glass-1 mx-3 mt-2 mb-1 flex items-center gap-3 rounded-2xl p-3">
               <LogoMark className="size-10 shrink-0" />
               <div className="min-w-0 flex-1">
                 <p className="text-[15px] font-semibold">Install Aval</p>
@@ -89,7 +89,7 @@ export function UpdateBar() {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 24, opacity: 0 }}
           transition={{ type: "spring", stiffness: 420, damping: 34 }}
-          className="glass fixed inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] z-50 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-3 rounded-2xl border border-line py-2 pr-2 pl-4 text-sm shadow-float"
+          className="glass-3 fixed inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] z-50 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-3 rounded-2xl py-2 pr-2 pl-4 text-sm"
         >
           <span className="font-medium">A new version of Aval is ready.</span>
           <Button size="sm" onClick={() => location.reload()}>

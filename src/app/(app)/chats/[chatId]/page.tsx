@@ -19,7 +19,7 @@ async function ChatLoader({ params }: { params: PageProps<"/chats/[chatId]">["pa
 
 function ChatSkeleton() {
   return (
-    <div className="bg-chat flex h-full flex-col" aria-busy="true" aria-label="Loading chat">
+    <div className="flex h-full flex-col" aria-busy="true" aria-label="Loading chat">
       <div className="flex h-16 items-center gap-3 border-b border-line bg-surface/70 px-4 pt-[env(safe-area-inset-top)]">
         <Skeleton className="size-[42px] rounded-full" />
         <div className="flex flex-col gap-1.5">

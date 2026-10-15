@@ -6,9 +6,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 const control =
-  "w-full rounded-2xl border border-line-strong bg-surface px-4 text-[15px] text-fg placeholder:text-subtle " +
-  "transition-[border-color,box-shadow] duration-150 hover:border-subtle/50 " +
-  "focus-visible:border-ring focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/20 " +
+  "glass-input w-full rounded-2xl px-4 text-[15px] text-fg placeholder:text-subtle hover:border-subtle/50 " +
   "aria-[invalid=true]:border-danger aria-[invalid=true]:focus-visible:ring-danger/15 disabled:opacity-60";
 
 type FieldShellProps = {

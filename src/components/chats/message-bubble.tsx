@@ -47,7 +47,7 @@ const SWIPE_TRIGGER = 64;
 function SystemLine({ message }: { message: UiMessage }) {
   return (
     <div className="flex justify-center px-6 py-1.5" data-message-id={message.id}>
-      <span className="rounded-full bg-surface/80 px-3 py-1 text-center text-xs font-medium text-muted shadow-[var(--shadow-sm)]">
+      <span className="glass-1 rounded-full px-3 py-1 text-center text-xs font-medium text-muted">
         {message.text}
       </span>
     </div>
@@ -127,8 +127,8 @@ function Bubble({ message, mine, groupStart, groupEnd, animate: animateIn, recei
                   ? "bg-white text-[#0f3d6e]"
                   : "bg-white/18 text-white"
                 : reacted
-                  ? "bg-brand text-white"
-                  : "bg-surface-3 text-fg",
+                  ? "glass-primary"
+                  : "glass-1 text-fg",
             )}
           >
             <span>{r.emoji}</span>
@@ -185,7 +185,7 @@ function Bubble({ message, mine, groupStart, groupEnd, animate: animateIn, recei
               : cn(
                   "rounded-[20px]",
                   mediaOnly ? "overflow-hidden p-1" : "px-3.5 pt-2 pb-2",
-                  mine ? "bg-brand text-white shadow-[0_6px_16px_-10px_rgb(29_78_216/0.7)]" : "border border-line bg-surface text-fg shadow-[var(--shadow-sm)]",
+                  mine ? "bubble-sent" : "glass-1 text-fg",
                   groupEnd && (mine ? "rounded-br-[6px]" : "rounded-bl-[6px]"),
                   !groupStart && (mine ? "rounded-tr-[8px]" : "rounded-tl-[8px]"),
                 ),

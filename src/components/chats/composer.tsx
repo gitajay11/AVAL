@@ -202,7 +202,7 @@ export function Composer({ chatId, onSend, onTyping, replyTo, onCancelReply, edi
             transition={{ type: "spring", stiffness: 500, damping: 40 }}
             className="overflow-hidden"
           >
-            <div className="glass mb-2 flex flex-col gap-2 rounded-[20px] border border-line p-2 shadow-[var(--shadow-sm)]">
+            <div className="glass-2 mb-2 flex flex-col gap-2 rounded-[20px] p-2">
               {banner && (
                 <div className="flex items-center gap-2.5 pl-2">
                   <banner.icon className="size-[18px] shrink-0 text-accent" aria-hidden="true" />
@@ -252,8 +252,8 @@ export function Composer({ chatId, onSend, onTyping, replyTo, onCancelReply, edi
         <EmojiPicker open={emojiOpen} onPick={insertEmoji} onClose={() => setEmojiOpen(false)} />
         <div
           className={cn(
-            "flex min-h-12 flex-1 items-end rounded-[24px] border bg-surface shadow-[var(--shadow-sm)] transition-colors",
-            dragOver ? "border-accent ring-4 ring-accent/20" : "border-line focus-within:border-ring focus-within:ring-4 focus-within:ring-ring/15",
+            "glass-2 glass-focus-within flex min-h-12 flex-1 items-end rounded-[24px] transition-shadow",
+            dragOver && "ring-4 ring-mint/40",
           )}
         >
           {recording ? (
@@ -328,7 +328,7 @@ export function Composer({ chatId, onSend, onTyping, replyTo, onCancelReply, edi
               <button type="button" onClick={voice.cancel} aria-label="Discard recording" className="grid size-12 place-items-center rounded-full bg-danger-soft text-danger">
                 <Trash2 className="size-5" />
               </button>
-              <button type="button" onClick={finishVoice} aria-label="Send voice message" className="grid size-12 place-items-center rounded-full bg-brand text-white shadow-[0_8px_20px_-8px_rgb(29_78_216/0.7)]">
+              <button type="button" onClick={finishVoice} aria-label="Send voice message" className="glass-primary grid size-12 place-items-center rounded-full transition-transform active:scale-[0.97]">
                 <ArrowUp className="size-6" strokeWidth={2.5} />
               </button>
             </motion.div>
@@ -342,7 +342,7 @@ export function Composer({ chatId, onSend, onTyping, replyTo, onCancelReply, edi
               exit={{ scale: 0.4, opacity: 0 }}
               whileTap={{ scale: 0.9 }}
               transition={{ type: "spring", stiffness: 600, damping: 28 }}
-              className="grid size-12 shrink-0 place-items-center rounded-full bg-brand text-white shadow-[0_8px_20px_-8px_rgb(29_78_216/0.7)]"
+              className="glass-primary grid size-12 shrink-0 place-items-center rounded-full transition-transform active:scale-[0.97]"
             >
               {editing ? <Check className="size-6" strokeWidth={2.5} /> : <ArrowUp className="size-6" strokeWidth={2.5} />}
             </motion.button>
@@ -358,7 +358,7 @@ export function Composer({ chatId, onSend, onTyping, replyTo, onCancelReply, edi
                 exit={{ scale: 0.4, opacity: 0 }}
                 whileTap={{ scale: 0.9 }}
                 transition={{ type: "spring", stiffness: 600, damping: 28 }}
-                className="grid size-12 shrink-0 place-items-center rounded-full border border-line bg-surface text-fg shadow-[var(--shadow-sm)]"
+                className="glass-2 glass-focus grid size-12 shrink-0 place-items-center rounded-full text-fg transition-transform active:scale-[0.97]"
               >
                 <Mic className="size-[22px]" />
               </motion.button>

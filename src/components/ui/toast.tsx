@@ -39,7 +39,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.98 }}
               transition={{ type: "spring", stiffness: 500, damping: 34 }}
-              className="glass pointer-events-auto flex items-center gap-2.5 rounded-2xl border border-line px-4 py-3 text-sm font-medium text-fg shadow-float"
+              className="glass-3 pointer-events-auto flex items-center gap-2.5 rounded-2xl px-4 py-3 text-sm font-medium text-fg"
               role={t.tone === "error" ? "alert" : "status"}
             >
               {t.tone === "success" ? (

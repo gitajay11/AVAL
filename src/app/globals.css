@@ -4,55 +4,100 @@
    media query below only matters before it runs or with JS disabled. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-/* ───────────── Brand tokens: deep navy/ocean base, emerald/teal accents ───────────── */
+/* ───────────── Brand tokens: jade / ocean / mint on frosted glass ───────────── */
 :root {
   color-scheme: light;
-  --bg: #eef3f8;
-  --bg-accent: #e3edf6;
-  --surface: #ffffff;
-  --surface-2: #f3f7fb;
-  --surface-3: #e7eef6;
-  --glass: rgb(255 255 255 / 0.72);
+  /* Backdrop: a pale sea-glass base under drifting jade / ocean / mint blobs. */
+  --bg: #eef6f4;
+  --bg-accent: #e3efec;
+  --jade: #0b7a61;
+  --ocean: #1b4e9e;
+  --mint: #6ee7c8;
+  --blob-jade: 0.2;
+  --blob-ocean: 0.25;
+  --blob-mint: 0.15;
+  --grain: 0.025;
+  /* Glass levels. The spec's light fills (55/65/75% white) are raised to
+     65/72/80% so every text token stays AA over the brightest blob. */
+  --glass-1: rgb(255 255 255 / 0.65);
+  --glass-1-hover: rgb(255 255 255 / 0.72);
+  --glass-2: rgb(255 255 255 / 0.72);
+  --glass-2-hover: rgb(255 255 255 / 0.78);
+  --glass-3: rgb(255 255 255 / 0.8);
+  --glass-solid: rgb(255 255 255 / 0.92);
+  --glass-border-from: rgb(255 255 255 / 0.9);
+  --glass-border-to: rgb(255 255 255 / 0.35);
+  --glass-highlight: inset 0 1px 0 rgb(255 255 255 / 0.7);
+  --glass-shadow: 0 8px 32px rgb(7 20 26 / 0.12);
+  --scrim: rgb(7 20 26 / 0.4);
+  --input-border: rgb(11 27 43 / 0.16);
+  /* Legacy surface names map onto the glass levels. */
+  --surface: var(--glass-1);
+  --surface-2: var(--glass-1-hover);
+  --surface-3: rgb(236 243 245 / 0.9);
+  --glass: var(--glass-2);
   --text: #0b1b2b;
-  --text-muted: #46596c; /* 7.0:1 on surface */
-  --text-subtle: #576b7f; /* ≥4.7:1 on every light surface */
+  --text-muted: #46596c; /* ≥5.8:1 on every glass level over any blob */
+  --text-subtle: #576b7f; /* ≥4.6:1 on every glass level over any blob */
   --border: rgb(11 27 43 / 0.09);
   --border-strong: rgb(11 27 43 / 0.16);
   --primary: #1d4ed8;
   --primary-fg: #ffffff;
-  --accent: #047857; /* emerald-700, 5.5:1 on white */
-  --accent-soft: rgb(16 185 129 / 0.12);
+  --accent: #047857; /* emerald-700 */
+  --accent-soft: rgb(16 185 129 / 0.14);
   --danger: #b91c1c;
   --danger-soft: rgb(220 38 38 / 0.1);
   --ring: #059669; /* ≥3.2:1 on every light surface (focus indicator) */
-  --grad-from: #1d4ed8;
-  --grad-to: #0f766e;
-  --shadow-sm: 0 1px 2px rgb(11 27 43 / 0.06), 0 1px 1px rgb(11 27 43 / 0.04);
-  --shadow-md: 0 8px 24px -6px rgb(11 27 43 / 0.12), 0 2px 6px rgb(11 27 43 / 0.05);
-  --shadow-lg: 0 24px 60px -12px rgb(11 27 43 / 0.22);
+  --glow: rgb(110 231 200 / 0.45);
+  --grad-from: #0b7a61; /* jade */
+  --grad-to: #1b4e9e; /* ocean */
+  --bubble-alpha: 0.95; /* 85% lets white text dip to 4.1:1 over the pale base */
+  --shadow-sm: 0 1px 2px rgb(7 20 26 / 0.06), 0 1px 1px rgb(7 20 26 / 0.04);
+  --shadow-md: 0 8px 24px -6px rgb(7 20 26 / 0.12), 0 2px 6px rgb(7 20 26 / 0.05);
+  --shadow-lg: 0 24px 60px -12px rgb(7 20 26 / 0.22);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #050d18;
-    --bg-accent: #071a2c;
-    --surface: #0b1728;
-    --surface-2: #102036;
-    --surface-3: #162a44;
-    --glass: rgb(11 23 40 / 0.7);
+    --bg: #07141a;
+    --bg-accent: #0a1d25;
+    --blob-jade: 0.35;
+    --blob-ocean: 0.4;
+    --blob-mint: 0.25;
+    --grain: 0.03;
+    /* The spec's white tint (4/7/10%) sits on a 62–68% layer of the deep base,
+       collapsed here into one colour: without it, text over the mint blob fails AA. */
+    --glass-1: rgb(28 45 53 / 0.64);
+    --glass-1-hover: rgb(39 55 62 / 0.65);
+    --glass-2: rgb(38 55 62 / 0.67);
+    --glass-2-hover: rgb(46 62 69 / 0.69);
+    --glass-3: rgb(47 62 69 / 0.71);
+    --glass-solid: #0d1f27;
+    --glass-border-from: rgb(255 255 255 / 0.18);
+    --glass-border-to: rgb(255 255 255 / 0.04);
+    --glass-highlight: inset 0 1px 0 rgb(255 255 255 / 0.12);
+    --glass-shadow: 0 8px 32px rgb(7 20 26 / 0.35);
+    --scrim: rgb(7 20 26 / 0.4);
+    --input-border: rgb(255 255 255 / 0.14);
+    --surface: var(--glass-1);
+    --surface-2: var(--glass-1-hover);
+    --surface-3: rgb(48 63 70 / 0.69);
+    --glass: var(--glass-2);
     --text: #e6eef7;
-    --text-muted: #a3b3c6;
-    --text-subtle: #8496ab;
+    --text-muted: #b8c5d4;
+    --text-subtle: #a2b2c4; /* brightened from #8496ab: the white tint lifts every surface */
     --border: rgb(230 238 247 / 0.08);
     --border-strong: rgb(230 238 247 / 0.16);
-    --primary: #60a5fa;
+    --primary: #86bcfb;
     --primary-fg: #04121f;
     --accent: #34d399;
     --accent-soft: rgb(52 211 153 / 0.14);
-    --danger: #f87171;
+    --danger: #fd9b9b;
     --danger-soft: rgb(248 113 113 / 0.12);
-    --ring: #34d399;
+    --ring: #6ee7c8; /* mint */
+    --glow: rgb(110 231 200 / 0.35);
+    --bubble-alpha: 0.85;
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
     --shadow-md: 0 10px 30px -8px rgb(0 0 0 / 0.55);
     --shadow-lg: 0 30px 70px -12px rgb(0 0 0 / 0.7);
@@ -61,24 +106,44 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #050d18;
-  --bg-accent: #071a2c;
-  --surface: #0b1728;
-  --surface-2: #102036;
-  --surface-3: #162a44;
-  --glass: rgb(11 23 40 / 0.7);
+  --bg: #07141a;
+  --bg-accent: #0a1d25;
+  --blob-jade: 0.35;
+  --blob-ocean: 0.4;
+  --blob-mint: 0.25;
+  --grain: 0.03;
+  /* The spec's white tint (4/7/10%) sits on a 62–68% layer of the deep base,
+     collapsed here into one colour: without it, text over the mint blob fails AA. */
+  --glass-1: rgb(28 45 53 / 0.64);
+  --glass-1-hover: rgb(39 55 62 / 0.65);
+  --glass-2: rgb(38 55 62 / 0.67);
+  --glass-2-hover: rgb(46 62 69 / 0.69);
+  --glass-3: rgb(47 62 69 / 0.71);
+  --glass-solid: #0d1f27;
+  --glass-border-from: rgb(255 255 255 / 0.18);
+  --glass-border-to: rgb(255 255 255 / 0.04);
+  --glass-highlight: inset 0 1px 0 rgb(255 255 255 / 0.12);
+  --glass-shadow: 0 8px 32px rgb(7 20 26 / 0.35);
+  --scrim: rgb(7 20 26 / 0.4);
+  --input-border: rgb(255 255 255 / 0.14);
+  --surface: var(--glass-1);
+  --surface-2: var(--glass-1-hover);
+  --surface-3: rgb(48 63 70 / 0.69);
+  --glass: var(--glass-2);
   --text: #e6eef7;
-  --text-muted: #a3b3c6;
-  --text-subtle: #8496ab;
+  --text-muted: #b8c5d4;
+  --text-subtle: #a2b2c4; /* brightened from #8496ab: the white tint lifts every surface */
   --border: rgb(230 238 247 / 0.08);
   --border-strong: rgb(230 238 247 / 0.16);
-  --primary: #60a5fa;
+  --primary: #86bcfb;
   --primary-fg: #04121f;
   --accent: #34d399;
   --accent-soft: rgb(52 211 153 / 0.14);
-  --danger: #f87171;
+  --danger: #fd9b9b;
   --danger-soft: rgb(248 113 113 / 0.12);
-  --ring: #34d399;
+  --ring: #6ee7c8; /* mint */
+  --glow: rgb(110 231 200 / 0.35);
+  --bubble-alpha: 0.85;
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
   --shadow-md: 0 10px 30px -8px rgb(0 0 0 / 0.55);
   --shadow-lg: 0 30px 70px -12px rgb(0 0 0 / 0.7);
@@ -102,6 +167,9 @@
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
   --color-ring: var(--ring);
+  --color-mint: var(--mint);
+  --color-jade: var(--jade);
+  --color-ocean: var(--ocean);
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
   --radius-xl: 16px;
   --radius-2xl: 20px;
@@ -120,6 +188,7 @@
 
   body {
     background: var(--bg);
+    min-height: 100dvh;
     color: var(--text);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
@@ -153,11 +222,6 @@
   color: transparent;
 }
 
-@utility glass {
-  background: var(--glass);
-  /* Standard property only: the CSS build adds the -webkit- prefix for Safari. */
-  backdrop-filter: saturate(180%) blur(18px);
-}
 
 @utility pt-safe {
   padding-top: env(safe-area-inset-top);
@@ -172,21 +236,236 @@
   padding-right: env(safe-area-inset-right);
 }
 
-/* Soft ambient background used on auth screens. */
-@utility bg-aurora {
-  background:
-    radial-gradient(60rem 40rem at 10% -10%, rgb(29 78 216 / 0.18), transparent 60%),
-    radial-gradient(50rem 36rem at 110% 10%, rgb(15 118 110 / 0.18), transparent 60%),
-    radial-gradient(40rem 30rem at 50% 120%, rgb(16 185 129 / 0.12), transparent 60%),
-    var(--bg);
+/* ───────────── Frosted glass ─────────────
+   Three levels share a 1px gradient border (::before, masked to a ring), a top
+   inner highlight and a soft ocean-tinted shadow.
+   - glass-1: fill only. It is used inside scrolling content (chat rows,
+     received bubbles, settings cards, inputs), where blur would be redone on
+     every scrolled frame.
+   - glass-2 / glass (headers, composer, banners) and glass-3 (menus, toasts):
+     live backdrop blur, only on fixed surfaces.
+   - glass-flat: same look without blur, for surfaces whose backdrop is already
+     blurred (sheets over the scrim, the full-height sidebar over the blobs). At
+     most two blurred layers ever overlap.
+   In the components layer so position/background utilities can override. */
+@layer components {
+  .glass-1,
+  .glass-2,
+  .glass-3,
+  .glass {
+    position: relative;
+    box-shadow: var(--glass-highlight), var(--glass-shadow);
+  }
+  .glass-1 {
+    background-color: var(--glass-1);
+  }
+  .glass-2,
+  .glass {
+    background-color: var(--glass-2);
+    /* Standard property only: the CSS build adds -webkit-backdrop-filter. */
+    backdrop-filter: blur(18px) saturate(160%);
+  }
+  .glass-3 {
+    background-color: var(--glass-3);
+    backdrop-filter: blur(24px) saturate(180%);
+  }
+  .glass-flat {
+    backdrop-filter: none;
+  }
+  :is(.glass-1, .glass-2, .glass-3, .glass)::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    padding: 1px;
+    border-radius: inherit;
+    background: linear-gradient(135deg, var(--glass-border-from), var(--glass-border-to));
+    mask:
+      linear-gradient(#000 0 0) content-box exclude,
+      linear-gradient(#000 0 0);
+    pointer-events: none;
+  }
+
+  /* Hover: a little brighter, plus a diagonal sheen that sweeps across once. */
+  .glass-sheen {
+    overflow: hidden;
+  }
+  .glass-sheen::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 0.16) 50%, transparent 65%);
+    transform: translateX(-120%);
+    pointer-events: none;
+  }
+  @media (hover: hover) {
+    .glass-1.glass-sheen:hover {
+      background-color: var(--glass-1-hover);
+    }
+    :is(.glass-2, .glass).glass-sheen:hover {
+      background-color: var(--glass-2-hover);
+    }
+    .glass-sheen:hover::after {
+      transform: translateX(120%);
+      transition: transform 600ms ease;
+    }
+  }
+
+  /* Sent bubble: tinted glass (jade → ocean), never blurred. */
+  .bubble-sent {
+    position: relative;
+    background-image: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--grad-from) calc(var(--bubble-alpha) * 100%), transparent),
+      color-mix(in srgb, var(--grad-to) calc(var(--bubble-alpha) * 100%), transparent)
+    );
+    color: #fff;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.22), 0 6px 18px -10px rgb(27 78 158 / 0.7);
+  }
+  .bubble-sent::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    border-radius: inherit;
+    background: linear-gradient(135deg, rgb(255 255 255 / 0.32), rgb(255 255 255 / 0.04));
+    mask:
+      linear-gradient(#000 0 0) content-box exclude,
+      linear-gradient(#000 0 0);
+    pointer-events: none;
+  }
+
+  /* Primary button / active nav: gradient glass capsule with a soft glow. */
+  .glass-primary {
+    background-image: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--grad-from) 92%, transparent),
+      color-mix(in srgb, var(--grad-to) 92%, transparent)
+    );
+    color: #fff;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25), 0 8px 24px -10px rgb(27 78 158 / 0.75);
+    transition: box-shadow 200ms ease, filter 200ms ease;
+  }
+  .glass-primary:hover,
+  .glass-primary:active {
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.3), 0 10px 30px -8px rgb(11 122 97 / 0.85), 0 0 0 4px var(--glow);
+  }
+  .glass-primary[aria-current="page"],
+  .glass-primary[data-active="true"] {
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.3), 0 8px 28px -8px rgb(11 122 97 / 0.8), 0 0 18px -2px var(--glow);
+  }
+
+  /* Inputs: glass-1 with a real 1px border (inputs can't have ::before);
+     on focus the border turns mint and a soft mint ring glows around it. */
+  .glass-input {
+    background-color: var(--glass-1);
+    border: 1px solid var(--input-border);
+    box-shadow: var(--glass-highlight);
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+  .glass-input:focus-visible {
+    outline: none;
+    border-color: var(--ring);
+    box-shadow: var(--glass-highlight), 0 0 0 4px var(--glow);
+  }
+  /* Secondary buttons and the composer pill: the same mint glow on focus. */
+  .glass-focus:focus-visible,
+  .glass-focus-within:focus-within {
+    box-shadow: var(--glass-highlight), var(--glass-shadow), 0 0 0 4px var(--glow);
+  }
 }
 
-/* Conversation backdrop: a quiet wash of the brand colours behind the bubbles. */
-@utility bg-chat {
-  background:
-    radial-gradient(40rem 30rem at 0% 0%, rgb(29 78 216 / 0.07), transparent 60%),
-    radial-gradient(40rem 30rem at 100% 100%, rgb(15 118 110 / 0.08), transparent 60%),
-    var(--bg);
+/* Older browsers without backdrop-filter: solid surfaces instead of see-through ones. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-2,
+  .glass,
+  .glass-3 {
+    background-color: var(--glass-solid);
+  }
+}
+
+/* Reduced transparency: solid surfaces, no blobs or grain. */
+@media (prefers-reduced-transparency: reduce) {
+  /* [data-theme] matches the theme blocks' specificity and wins by coming later. */
+  :root,
+  :root[data-theme] {
+    --glass-1: var(--glass-solid);
+    --glass-1-hover: var(--glass-solid);
+    --glass-2: var(--glass-solid);
+    --glass-2-hover: var(--glass-solid);
+    --glass-3: var(--glass-solid);
+    --surface-3: var(--glass-solid);
+    --bubble-alpha: 1;
+  }
+  .glass-2,
+  .glass,
+  .glass-3 {
+    backdrop-filter: none;
+  }
+  .aval-backdrop {
+    display: none;
+  }
+}
+
+/* ───────────── Backdrop: drifting blobs + grain (components/app/backdrop.tsx) ───────────── */
+.aval-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--bg);
+}
+.aval-blob {
+  position: absolute;
+  width: 70vmax;
+  height: 70vmax;
+  border-radius: 50%;
+  /* A radial falloff gives the 80–120px blur look without a per-frame filter. */
+  background: radial-gradient(closest-side, var(--blob-color), transparent);
+  opacity: var(--blob-opacity);
+  will-change: transform;
+}
+.aval-grain {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: var(--grain);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+@keyframes drift-a {
+  to {
+    transform: translate3d(14vw, 10vh, 0) scale(1.12);
+  }
+}
+@keyframes drift-b {
+  to {
+    transform: translate3d(-12vw, 14vh, 0) scale(0.9);
+  }
+}
+@keyframes drift-c {
+  to {
+    transform: translate3d(10vw, -12vh, 0) scale(1.08);
+  }
+}
+/* Paused while scrolling (see backdrop.tsx). */
+.aval-backdrop[data-paused] .aval-blob {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .aval-blob:nth-child(1) {
+    animation: drift-a 26s ease-in-out infinite alternate;
+  }
+  .aval-blob:nth-child(2) {
+    animation: drift-b 30s ease-in-out infinite alternate;
+  }
+  .aval-blob:nth-child(3) {
+    animation: drift-c 22s ease-in-out infinite alternate;
+  }
+  .aval-blob:nth-child(4) {
+    animation: drift-a 28s ease-in-out -9s infinite alternate-reverse;
+  }
 }
 
 @keyframes shimmer {
@@ -203,5 +482,8 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+  .glass-sheen::after {
+    display: none;
   }
 }

@@ -697,7 +697,7 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
 
   return (
     <ChatActionsContext value={actions}>
-      <div className="bg-chat relative h-full">
+      <div className="relative h-full">
         <ChatHeader
           chat={chat}
           readOnly={readOnly}
@@ -746,7 +746,7 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
               transition={{ type: "spring", stiffness: 500, damping: 30 }}
               onClick={() => (s.newerCursor !== null ? returnToLatest() : scrollToBottom())}
               style={{ bottom: footerHeight + 12 }}
-              className="glass absolute right-4 z-10 grid size-11 place-items-center rounded-full border border-line text-fg shadow-float"
+              className="glass-2 glass-sheen absolute right-4 z-10 grid size-11 place-items-center rounded-full text-fg"
               aria-label={newWhileAway ? `${newWhileAway} new messages. Scroll to bottom` : "Scroll to bottom"}
             >
               <ChevronDown className="size-6" />
@@ -772,19 +772,19 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
               onCancelEdit={() => setEditing(null)}
             />
           ) : readOnly ? (
-            <div className="glass mx-auto flex max-w-lg items-center justify-center gap-2 rounded-2xl border border-line px-4 py-3 text-sm text-muted">
+            <div className="glass-2 mx-auto flex max-w-lg items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm text-muted">
               <Eye className="size-4 shrink-0" aria-hidden="true" />
               View only. You can&apos;t reply, react, forward or download.
             </div>
           ) : detail.blockedByMe ? (
-            <div className="glass mx-auto flex max-w-lg items-center justify-between gap-3 rounded-2xl border border-line px-4 py-2.5">
+            <div className="glass-2 mx-auto flex max-w-lg items-center justify-between gap-3 rounded-2xl px-4 py-2.5">
               <p className="text-sm text-muted">You blocked {chat.title}.</p>
               <Button size="sm" variant="secondary" onClick={unblock}>
                 Unblock
               </Button>
             </div>
           ) : (
-            <p className="glass mx-auto flex max-w-lg items-center justify-center gap-2 rounded-2xl border border-line px-4 py-3 text-center text-sm text-muted">
+            <p className="glass-2 mx-auto flex max-w-lg items-center justify-center gap-2 rounded-2xl px-4 py-3 text-center text-sm text-muted">
               <Lock className="size-4 shrink-0" aria-hidden="true" />
               {detail.cantSendReason}
             </p>

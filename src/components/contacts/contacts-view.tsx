@@ -84,7 +84,7 @@ function PublicSearch() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search by name (2+ letters)"
-          className="h-11 w-full rounded-2xl bg-surface-3 pr-4 pl-10 text-[15px] placeholder:text-subtle focus-visible:ring-4 focus-visible:ring-ring/20 focus-visible:outline-none"
+          className="h-11 w-full rounded-2xl glass-input pr-4 pl-10 text-[15px] placeholder:text-subtle"
         />
       </label>
       <div className="-mx-2">
