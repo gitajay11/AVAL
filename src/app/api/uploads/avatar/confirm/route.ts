@@ -1,0 +1,45 @@
+import { ApiError, json, parseJson, route } from "@/lib/api";
+import { requireSession } from "@/lib/auth/session";
+import { db } from "@/lib/db";
+import { sniffMime } from "@/lib/media/sniff";
+import { deleteObject, headObject, readHead, UPLOAD_URL_TTL_SECONDS } from "@/lib/r2";
+import { meSelect, toMe } from "@/lib/users";
+import { AVATAR_MAX_BYTES, ConfirmUploadSchema } from "@/lib/validation/profile";
+
+/**
+ * Step 2 of 2: verify what actually landed in R2 (size and real file signature)
+ * before it becomes the user's avatar. Anything that doesn't match is deleted.
+ */
+export const POST = route(async (req) => {
+  const { user } = await requireSession();
+  const { uploadId } = await parseJson(req, ConfirmUploadSchema);
+
+  const upload = await db.attachment.findFirst({
+    where: { id: uploadId, uploaderId: user.id, kind: "AVATAR", status: "PENDING" },
+  });
+  const maxAgeMs = (UPLOAD_URL_TTL_SECONDS + 10 * 60) * 1000;
+  if (!upload || Date.now() - upload.createdAt.getTime() > maxAgeMs) {
+    throw new ApiError(404, "upload_not_found", "Upload expired. Please try again.");
+  }
+
+  const reject = async (message: string) => {
+    await deleteObject(upload.objectKey);
+    await db.attachment.delete({ where: { id: upload.id } });
+    throw new ApiError(422, "invalid_upload", message);
+  };
+
+  const head = await headObject(upload.objectKey);
+  if (!head) throw new ApiError(409, "upload_missing", "Upload didn't finish. Please try again.");
+  if (head.size !== upload.sizeBytes || head.size > AVATAR_MAX_BYTES) await reject("File size didn't match.");
+  if (sniffMime(await readHead(upload.objectKey)) !== upload.mimeType) await reject("That file isn't a valid image.");
+
+  const previous = await db.user.findUniqueOrThrow({ where: { id: user.id }, select: { avatarKey: true } });
+  const [, row] = await db.$transaction([
+    db.attachment.update({ where: { id: upload.id }, data: { status: "READY" } }),
+    db.user.update({ where: { id: user.id }, data: { avatarKey: upload.objectKey }, select: meSelect }),
+    ...(previous.avatarKey ? [db.attachment.deleteMany({ where: { objectKey: previous.avatarKey } })] : []),
+  ]);
+  if (previous.avatarKey) await deleteObject(previous.avatarKey);
+
+  return json({ user: toMe(row) });
+});
