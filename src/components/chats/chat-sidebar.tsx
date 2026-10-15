@@ -4,16 +4,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { useRef, useState } from "react";
-import { Archive, Bell, BookUser, ChevronLeft, ChevronRight, MessageCircleMore, Search, SquarePen, Star, X } from "lucide-react";
+import { Archive, Bell, BookUser, ChevronLeft, ChevronRight, MessageCircleMore, Search, SquarePen, Star, UserRound, UsersRound, X } from "lucide-react";
 import { PublicContactResults } from "@/components/contacts/public-contact-results";
 import { useNotifications } from "@/components/notifications/notifications-provider";
 import { useUser } from "@/components/app/user-context";
 import { VerifyBanner } from "@/components/app/verify-banner";
 import { useRealtime } from "@/components/realtime/realtime-provider";
+import { ActionMenu } from "@/components/ui/action-menu";
 import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/cn";
 import { useChats } from "./chat-store";
 import { ChatListItem } from "./chat-list-item";
+import { MessageResults } from "./message-results";
+import { NewGroupSheet } from "./new-group";
 import { PeopleResults } from "./people-results";
 
 function ConnectionPill() {
@@ -33,6 +36,8 @@ export function ChatSidebar() {
   const { unread: unreadNotifications } = useNotifications();
   const [query, setQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+  const [compose, setCompose] = useState<{ x: number; y: number } | null>(null);
+  const [newGroup, setNewGroup] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const activeId = pathname.startsWith("/chats/") ? pathname.split("/")[2] : null;
   const searching = query.trim().length > 0;
@@ -94,13 +99,27 @@ export function ChatSidebar() {
           </Link>
           <button
             type="button"
-            onClick={() => input.current?.focus()}
+            onClick={(e) => {
+              const r = e.currentTarget.getBoundingClientRect();
+              setCompose({ x: r.right - 200, y: r.bottom + 4 });
+            }}
             className="grid size-10 place-items-center rounded-xl text-muted hover:bg-surface-3 hover:text-fg"
             aria-label="New chat"
+            aria-haspopup="menu"
           >
             <SquarePen className="size-5" />
           </button>
         </div>
+        <ActionMenu
+          anchor={compose}
+          onClose={() => setCompose(null)}
+          label="New"
+          items={[
+            { label: "New message", icon: UserRound, onSelect: () => input.current?.focus() },
+            { label: "New group", icon: UsersRound, onSelect: () => setNewGroup(true) },
+          ]}
+        />
+        <NewGroupSheet open={newGroup} onClose={() => setNewGroup(false)} />
         <label className="relative mt-3 block">
           <span className="sr-only">Search chats and people</span>
           <Search className="pointer-events-none absolute top-1/2 left-3.5 size-[18px] -translate-y-1/2 text-subtle" aria-hidden="true" />
@@ -110,7 +129,7 @@ export function ChatSidebar() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Escape" && setQuery("")}
-            placeholder="Search chats, @people or contacts"
+            placeholder="Search chats, @people or messages"
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
@@ -167,6 +186,7 @@ export function ChatSidebar() {
 
         {searching && <PeopleResults query={query} onOpened={() => setQuery("")} />}
         {searching && <PublicContactResults query={query} heading="Public contacts" />}
+        {searching && <MessageResults query={query} meId={me.id} onOpened={() => setQuery("")} />}
 
         {showArchived && !searching && archived.length === 0 && (
           <p className="px-6 py-10 text-center text-[15px] text-muted">No archived chats. Swipe a chat or right-click it to archive.</p>

@@ -4,6 +4,7 @@ import { memo, useSyncExternalStore } from "react";
 import { animate, motion, useMotionValue, useTransform } from "motion/react";
 import { AlertCircle, Check, CheckCheck, Clock3, Forward, Pin, Reply, Star } from "lucide-react";
 import { useLongPress } from "@/components/ui/action-menu";
+import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/cn";
 import { formatClock } from "@/lib/client/time";
 import { isJumboEmoji, type UiMessage } from "@/lib/chats/timeline";
@@ -42,8 +43,29 @@ const useTouch = () => useSyncExternalStore(() => () => {}, coarse, () => false)
 
 const SWIPE_TRIGGER = 64;
 
-export const MessageBubble = memo(function MessageBubble({ message, mine, groupStart, groupEnd, animate: animateIn, receipt, highlighted }: Props) {
+/** Group events ("Ada added Grace") as a centered pill. */
+function SystemLine({ message }: { message: UiMessage }) {
+  return (
+    <div className="flex justify-center px-6 py-1.5" data-message-id={message.id}>
+      <span className="rounded-full bg-surface/80 px-3 py-1 text-center text-xs font-medium text-muted shadow-[var(--shadow-sm)]">
+        {message.text}
+      </span>
+    </div>
+  );
+}
+
+// Stable per-person name colours in groups (all AA on both surfaces).
+const NAME_COLORS = ["text-[#2563eb]", "text-[#0d9488]", "text-[#7c3aed]", "text-[#c2410c]", "text-[#db2777]", "text-[#15803d]"];
+const nameColor = (id: string) => NAME_COLORS[([...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0) >>> 0) % NAME_COLORS.length];
+
+export const MessageBubble = memo(function MessageBubble(props: Props) {
+  if (props.message.type === "SYSTEM") return <SystemLine message={props.message} />;
+  return <Bubble {...props} />;
+});
+
+function Bubble({ message, mine, groupStart, groupEnd, animate: animateIn, receipt, highlighted }: Props) {
   const actions = useChatActions();
+  const showPeople = actions.isGroup && !mine;
   const touch = useTouch();
   const x = useMotionValue(0);
   const replyIconOpacity = useTransform(x, [-SWIPE_TRIGGER, -16, 0], [1, 0, 0]);
@@ -142,6 +164,11 @@ export const MessageBubble = memo(function MessageBubble({ message, mine, groupS
         className={cn("flex max-w-[min(82%,560px)] items-end gap-2", mine && "flex-row-reverse")}
         {...longPress}
       >
+        {showPeople && (
+          <span className="w-8 shrink-0 self-end">
+            {groupEnd && <Avatar name={actions.nameOf(message.senderId)} src={actions.avatarOf(message.senderId)} size={32} />}
+          </span>
+        )}
         <div
           className={cn(
             "relative min-w-0 text-[15px] leading-[1.4] transition-shadow duration-500",
@@ -158,6 +185,11 @@ export const MessageBubble = memo(function MessageBubble({ message, mine, groupS
             message.status === "sending" && !uploading && "opacity-80",
           )}
         >
+          {showPeople && groupStart && !jumbo && (
+            <p className={cn("mb-0.5 truncate text-[13px] font-bold", message.senderId && nameColor(message.senderId))}>
+              {actions.nameOf(message.senderId)}
+            </p>
+          )}
           {message.forwardedFromName && !message.deleted && (
             <p className={cn("mb-1 flex items-center gap-1 text-[13px] font-semibold", mine ? "text-white/85" : "text-accent")}>
               <Forward className="size-3.5" aria-hidden="true" /> Forwarded from {message.forwardedFromName}
@@ -226,4 +258,4 @@ export const MessageBubble = memo(function MessageBubble({ message, mine, groupS
       </motion.div>
     </div>
   );
-});
+}

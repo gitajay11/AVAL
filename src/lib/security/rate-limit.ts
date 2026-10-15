@@ -33,6 +33,7 @@ export const RULES = {
   report: { limit: 10, window: "1 d" },
   contactWrite: { limit: 60, window: "10 m" },
   accessRequest: { limit: 20, window: "1 h" },
+  pushSubscribe: { limit: 20, window: "1 h" },
 } satisfies Record<string, Rule>;
 
 export type RuleName = keyof typeof RULES;

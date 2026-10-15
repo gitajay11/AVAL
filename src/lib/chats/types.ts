@@ -65,7 +65,18 @@ export type PeerDTO = {
   avatarUrl: string | null;
 };
 
-export type LastMessageDTO = Pick<MessageDTO, "id" | "senderId" | "type" | "text" | "createdAt" | "deleted">;
+export type LastMessageDTO = Pick<MessageDTO, "id" | "senderId" | "type" | "text" | "createdAt" | "deleted"> & {
+  /** Groups: shown as "Grace: …" in the chat list. */
+  senderName?: string | null;
+};
+
+export type MemberDTO = {
+  id: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+  role: "OWNER" | "ADMIN" | "MEMBER";
+};
 
 export type ChatListItemDTO = {
   id: string;
@@ -80,6 +91,8 @@ export type ChatListItemDTO = {
   archived: boolean;
   muted: boolean;
   markedUnread: boolean;
+  /** GROUP: number of members. */
+  memberCount: number | null;
   /** CONTACT: the personal contact behind this one-way chat. */
   contact: { id: string; visibility: "PRIVATE" | "PUBLIC" } | null;
   /** DIRECT: the peer's receipt watermarks, for ✓✓ on my last message. */
@@ -91,6 +104,12 @@ export type MessagePage = {
   messages: MessageDTO[]; // oldest → newest
   /** Pass as `before` to load older messages; null when the start is reached. */
   olderCursor: string | null;
+};
+
+/** A window around one message (jump to a search result or a reply far back). */
+export type MessageWindow = MessagePage & {
+  /** Pass as `after` to load newer messages; null when the window reaches the latest. */
+  newerCursor: string | null;
 };
 
 export type PresenceDTO =
@@ -116,6 +135,10 @@ export type ChatDetailDTO = {
   receipts: ReceiptDTO[];
   /** Most recently pinned message, if any. */
   pinned: MessageDTO | null;
+  /** GROUP: members with roles (for names, photos and admin actions), and my role. */
+  members: MemberDTO[] | null;
+  myRole: "OWNER" | "ADMIN" | "MEMBER" | null;
+  description: string | null;
   page: MessagePage;
 };
 
@@ -133,6 +156,7 @@ export type RealtimeEvent =
   | { name: "receipt"; data: { chatId: string } & ReceiptDTO }
   | { name: "chat.read"; data: { chatId: string; lastReadAt: string } }
   | { name: "chat.settings"; data: { chatId: string } & ChatSettingsDTO }
+  | { name: "chat.removed"; data: { chatId: string } }
   | { name: "typing"; data: { chatId: string; userId: string } }
   | { name: "presence"; data: { userId: string; presence: PresenceDTO } }
   | { name: "notification.new"; data: { notification: NotificationDTO } }

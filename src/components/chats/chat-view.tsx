@@ -6,6 +6,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { VirtuosoHandle } from "react-virtuoso";
 import { ChevronDown, Copy, Eye, Flag, Forward, Lock, Pencil, Pin, PinOff, Reply, Star, StarOff, Trash2 } from "lucide-react";
 import { PublicContactSheet } from "@/components/contacts/public-contact-sheet";
+import { ChatSearch } from "./chat-search";
+import { GroupInfoSheet } from "./group-info";
 import { useUser } from "@/components/app/user-context";
 import { useRealtime, useRealtimeEvent } from "@/components/realtime/realtime-provider";
 import { ActionMenu, type MenuItem } from "@/components/ui/action-menu";
@@ -15,7 +17,7 @@ import { api, ClientApiError } from "@/lib/client/api";
 import { uploadMedia, type PreparedMedia } from "@/lib/client/media-upload";
 import { encodeCursor } from "@/lib/chats/cursor";
 import { buildTimeline, messageKey, upsertSorted, type TimelineItem, type UiMessage } from "@/lib/chats/timeline";
-import type { AttachmentDTO, ChatDetailDTO, MessageDTO, MessagePage, ReactionDTO, ReceiptDTO } from "@/lib/chats/types";
+import type { AttachmentDTO, ChatDetailDTO, MemberDTO, MessageDTO, MessagePage, MessageWindow, ReactionDTO, ReceiptDTO } from "@/lib/chats/types";
 import type { PublicContactDTO } from "@/lib/contacts/types";
 import { EDIT_WINDOW_MS } from "@/lib/validation/chat";
 import { ChatActionsContext, type ChatActions } from "./chat-actions";
@@ -35,8 +37,14 @@ type State = {
   confirmed: UiMessage[];
   pending: UiMessage[];
   olderCursor: string | null;
+  /**
+   * Non-null while showing a window in the past (after jumping to an old
+   * message): newer messages load as you scroll down, and live ones wait.
+   */
+  newerCursor: string | null;
   firstItemIndex: number;
   loadingOlder: boolean;
+  loadingNewer: boolean;
 };
 
 type Job = { text: string; media: PreparedMedia | null; replyToId?: string; attachmentId?: string };
@@ -76,8 +84,10 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
     confirmed: detail.page.messages.map(sent),
     pending: [],
     olderCursor: detail.page.olderCursor,
+    newerCursor: null,
     firstItemIndex: FIRST_INDEX,
     loadingOlder: false,
+    loadingNewer: false,
   }));
   const stateRef = useRef(s);
   useEffect(() => {
@@ -95,6 +105,12 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
   const [reporting, setReporting] = useState<ReportTarget>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [groupOpen, setGroupOpen] = useState(false);
+  const isGroup = chat.type === "GROUP";
+  const [members, setMembers] = useState<MemberDTO[]>(detail.members ?? []);
+  const [myRole, setMyRole] = useState(detail.myRole);
+  const isAdmin = myRole === "OWNER" || myRole === "ADMIN";
 
   const build = useCallback(
     (confirmed: UiMessage[], pending: UiMessage[]) => buildTimeline([...confirmed, ...pending], { meId: me.id, unreadAfter }),
@@ -105,9 +121,10 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
   useEffect(() => {
     itemsRef.current = items;
   }, [items]);
-  const [initialIndex] = useState(() => {
+  // The list is re-mounted (new key) when we switch windows, starting at `initialIndex`.
+  const [view, setView] = useState(() => {
     const unread = items.findIndex((i) => i.kind === "unread");
-    return unread !== -1 ? unread : Math.max(0, items.length - 1);
+    return { key: 0, initialIndex: unread !== -1 ? unread : Math.max(0, items.length - 1) };
   });
 
   const list = useRef<VirtuosoHandle>(null);
@@ -140,6 +157,11 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
       const cur = stateRef.current;
       const known = cur.confirmed.some((x) => x.id === m.id);
       const replacesPending = m.senderId === me.id && cur.pending.some((p) => p.clientId === m.clientId);
+      if (cur.newerCursor !== null && !known && !replacesPending) {
+        // Viewing older history: it'll load when scrolling down to it.
+        if (m.senderId !== me.id) setNewWhileAway((n) => n + 1);
+        return;
+      }
       if (!known && !replacesPending) {
         markFresh(messageKey(m));
         if (m.senderId !== me.id && !atBottomRef.current) setNewWhileAway((n) => n + 1);
@@ -185,7 +207,18 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
     [refreshPinned],
   );
 
+  const refreshMembers = useCallback(() => {
+    if (!isGroup) return;
+    api<{ members: MemberDTO[]; myRole: "OWNER" | "ADMIN" | "MEMBER" }>(`/api/chats/${chatId}/members`)
+      .then((r) => {
+        setMembers(r.members);
+        setMyRole(r.myRole);
+      })
+      .catch(() => {});
+  }, [chatId, isGroup]);
+
   const catchUp = useCallback(async () => {
+    if (stateRef.current.newerCursor !== null) return; // detached: nothing to append
     const last = stateRef.current.confirmed.at(-1);
     if (!last) {
       const page = await api<MessagePage>(`/api/chats/${chatId}/messages`);
@@ -217,7 +250,14 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
   useRealtimeEvent((e) => {
     switch (e.name) {
       case "message.new":
-        if (e.data.message.chatId === chatId) receive(e.data.message);
+        if (e.data.message.chatId === chatId) {
+          receive(e.data.message);
+          // Group events (joins, leaves, roles, renames) change the member list.
+          if (e.data.message.type === "SYSTEM") refreshMembers();
+        }
+        break;
+      case "chat.removed":
+        if (e.data.chatId === chatId) leave();
         break;
       case "message.updated":
         if (e.data.message.chatId === chatId) onUpdated(e.data.message);
@@ -277,6 +317,52 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
     }
   }, [build, chatId]);
 
+  /** Replace what's shown with a window of history, re-mounting the list at `targetId`. */
+  const showWindow = useCallback(
+    (win: MessagePage & { newerCursor: string | null }, targetId: string | null) => {
+      const confirmed = win.messages.map(sent);
+      const timeline = build(confirmed, []);
+      const idx = targetId ? timeline.findIndex((i) => i.kind === "message" && i.message.id === targetId) : timeline.length - 1;
+      setS((x) => ({
+        ...x,
+        confirmed,
+        pending: win.newerCursor === null ? x.pending : [],
+        olderCursor: win.olderCursor,
+        newerCursor: win.newerCursor,
+        firstItemIndex: FIRST_INDEX,
+        loadingOlder: false,
+        loadingNewer: false,
+      }));
+      setView((v) => ({ key: v.key + 1, initialIndex: Math.max(0, idx) }));
+    },
+    [build],
+  );
+
+  /** Leave older history and show the latest messages again. */
+  const returnToLatest = useCallback(async () => {
+    const page = await api<MessagePage>(`/api/chats/${chatId}/messages`);
+    showWindow({ ...page, newerCursor: null }, null);
+    setNewWhileAway(0);
+  }, [chatId, showWindow]);
+
+  const loadNewer = useCallback(async () => {
+    const cur = stateRef.current;
+    if (!cur.newerCursor || cur.loadingNewer) return;
+    setS((x) => ({ ...x, loadingNewer: true }));
+    try {
+      const { messages } = await api<{ messages: MessageDTO[] }>(`/api/chats/${chatId}/messages?after=${cur.newerCursor}`);
+      setS((x) => ({
+        ...x,
+        confirmed: messages.map(sent).reduce(upsertSorted, x.confirmed),
+        // The "after" page holds up to 100; fewer means we've reached the latest.
+        newerCursor: messages.length >= 100 ? encodeCursor(messages[messages.length - 1]) : null,
+        loadingNewer: false,
+      }));
+    } catch {
+      setS((x) => ({ ...x, loadingNewer: false }));
+    }
+  }, [chatId]);
+
   const setPendingState = useCallback((clientId: string, patch: Partial<UiMessage>) => {
     setS((x) => ({ ...x, pending: x.pending.map((p) => (p.clientId === clientId ? { ...p, ...patch } : p)) }));
   }, []);
@@ -304,7 +390,9 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
   );
 
   const send = useCallback(
-    ({ text, media }: ComposerSubmit) => {
+    async ({ text, media }: ComposerSubmit) => {
+      // Sending from an older window first returns to the latest messages.
+      if (stateRef.current.newerCursor !== null) await returnToLatest();
       const clientId = crypto.randomUUID().replace(/-/g, "");
       const local: AttachmentDTO[] = media
         ? [
@@ -351,7 +439,7 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
       scrollToBottom();
       post(clientId);
     },
-    [chatId, me.id, post, replyTo, scrollToBottom],
+    [chatId, me.id, post, replyTo, returnToLatest, scrollToBottom],
   );
 
   const retry = useCallback(
@@ -380,29 +468,50 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
     setTimeout(() => setHighlightedId((h) => (h === id ? null : h)), 1600);
   }, []);
 
-  /** Scroll to a message, loading older pages if it isn't loaded yet. */
+  /**
+   * Scroll to a message. If it isn't loaded, load a window around it (any age)
+   * and continue from there in both directions.
+   */
   const jumpTo = useCallback(
     async (id: string) => {
-      for (let attempt = 0; attempt < 15; attempt++) {
-        const idx = itemsRef.current.findIndex((i) => i.kind === "message" && i.message.id === id);
-        if (idx !== -1) {
-          list.current?.scrollToIndex({ index: idx, align: "center", behavior: "smooth" });
-          flash(id);
-          return;
-        }
-        if (!stateRef.current.olderCursor) break;
-        await loadOlder();
-        await new Promise((r) => setTimeout(r, 60));
+      const idx = itemsRef.current.findIndex((i) => i.kind === "message" && i.message.id === id);
+      if (idx !== -1) {
+        list.current?.scrollToIndex({ index: idx, align: "center", behavior: "smooth" });
+        flash(id);
+        return;
       }
-      toast("That message is no longer available.", "error");
+      try {
+        const win = await api<MessageWindow>(`/api/chats/${chatId}/messages?around=${id}`);
+        showWindow(win, id);
+        setTimeout(() => flash(id), 250);
+      } catch {
+        toast("That message is no longer available.", "error");
+      }
     },
-    [flash, loadOlder, toast],
+    [chatId, flash, showWindow, toast],
   );
 
+  // Opened from a search result: /chats/:id?m=<messageId>
+  const jumped = useRef(false);
+  useEffect(() => {
+    if (jumped.current) return;
+    jumped.current = true;
+    const target = new URLSearchParams(window.location.search).get("m");
+    if (target) {
+      history.replaceState(history.state, "", window.location.pathname);
+      setTimeout(() => jumpTo(target), 0);
+    }
+  }, [jumpTo]);
+
   const nameOf = useCallback(
-    (userId: string | null) => (userId === me.id ? "You" : userId === chat.peer?.id ? chat.peer!.displayName : "Unknown"),
-    [chat.peer, me.id],
+    (userId: string | null) => {
+      if (userId === me.id) return "You";
+      if (userId && userId === chat.peer?.id) return chat.peer.displayName;
+      return members.find((m) => m.id === userId)?.displayName ?? "Former member";
+    },
+    [chat.peer, me.id, members],
   );
+  const avatarOf = useCallback((userId: string | null) => members.find((m) => m.id === userId)?.avatarUrl ?? null, [members]);
 
   const canSend = detail.canSend;
   const actions = useMemo<ChatActions>(
@@ -410,13 +519,15 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
       meId: me.id,
       readOnly,
       nameOf,
+      isGroup,
+      avatarOf,
       retry,
       reply: (m) => canSend && setReplyTo(m),
       openMenu: (m, point) => !readOnly && setMenu({ message: m, point, openedAt: Date.now() }),
       toggleReaction: (m, emoji) => !readOnly && toggleReaction(m, emoji),
       jumpTo,
     }),
-    [canSend, jumpTo, me.id, nameOf, readOnly, retry, toggleReaction],
+    [avatarOf, canSend, isGroup, jumpTo, me.id, nameOf, readOnly, retry, toggleReaction],
   );
 
   const receiptFor = useCallback(
@@ -477,7 +588,7 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
             hidden: !m.text,
           },
           { label: "Forward", icon: Forward, onSelect: () => setForwarding(m) },
-          { label: m.pinnedAt ? "Unpin" : "Pin", icon: m.pinnedAt ? PinOff : Pin, onSelect: () => setPin(m, !m.pinnedAt) },
+          { label: m.pinnedAt ? "Unpin" : "Pin", icon: m.pinnedAt ? PinOff : Pin, onSelect: () => setPin(m, !m.pinnedAt), hidden: isGroup && !isAdmin },
           { label: m.starred ? "Unstar" : "Star", icon: m.starred ? StarOff : Star, onSelect: () => setStar(m, !m.starred) },
           { label: "Edit", icon: Pencil, onSelect: () => setEditing(m), hidden: !editable },
           { label: "Delete", icon: Trash2, onSelect: () => setDeleting(m), danger: true },
@@ -578,7 +689,10 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
           chat={chat}
           readOnly={readOnly}
           pinned={pinned}
+          nameOf={nameOf}
+          onSearch={() => setSearchOpen(true)}
           onOpenProfile={() => {
+            if (isGroup) return setGroupOpen(true);
             if (!chat.contact) return setProfileOpen(true);
             if (!readOnly) return router.push(`/contacts/${chat.contact.id}`);
             api<{ contact: PublicContactDTO }>(`/api/contacts/${chat.contact.id}/public`)
@@ -586,14 +700,15 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
               .catch(() => {});
           }}
           onJumpToPinned={() => pinned && jumpTo(pinned.id)}
-          onUnpin={() => pinned && setPin(pinned, false)}
+          onUnpin={() => pinned && (!isGroup || isAdmin) && setPin(pinned, false)}
         />
 
         <MessageList
+          key={view.key}
           ref={list}
           items={items}
           firstItemIndex={s.firstItemIndex}
-          initialIndex={initialIndex}
+          initialIndex={view.initialIndex}
           meId={me.id}
           loadingOlder={s.loadingOlder}
           reachedStart={s.olderCursor === null}
@@ -603,18 +718,20 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
           receiptFor={receiptFor}
           shouldAnimate={shouldAnimate}
           onStartReached={loadOlder}
+          onEndReached={loadNewer}
+          loadingNewer={s.loadingNewer}
           onAtBottomChange={onAtBottomChange}
         />
 
         <AnimatePresence>
-          {!atBottom && (
+          {(!atBottom || s.newerCursor !== null) && (
             <motion.button
               type="button"
               initial={{ opacity: 0, scale: 0.8, y: 8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.8, y: 8 }}
               transition={{ type: "spring", stiffness: 500, damping: 30 }}
-              onClick={() => scrollToBottom()}
+              onClick={() => (s.newerCursor !== null ? returnToLatest() : scrollToBottom())}
               style={{ bottom: footerHeight + 12 }}
               className="glass absolute right-4 z-10 grid size-11 place-items-center rounded-full border border-line text-fg shadow-float"
               aria-label={newWhileAway ? `${newWhileAway} new messages. Scroll to bottom` : "Scroll to bottom"}
@@ -665,7 +782,7 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
         <ForwardSheet message={forwarding} onClose={() => setForwarding(null)} />
         <DeleteDialog
           message={deleting}
-          mine={deleting?.senderId === me.id}
+          mine={deleting?.senderId === me.id || (isGroup && isAdmin)}
           onClose={() => setDeleting(null)}
           onDeleted={(id, forEveryone) =>
             forEveryone
@@ -675,6 +792,21 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
         />
         <ReportSheet target={reporting} onClose={() => setReporting(null)} />
         <PublicContactSheet contact={contactCard} onClose={() => setContactCard(null)} onChange={setContactCard} />
+        <ChatSearch open={searchOpen} chatId={chatId} nameOf={nameOf} onClose={() => setSearchOpen(false)} onPick={(id) => {
+          setSearchOpen(false);
+          jumpTo(id);
+        }} />
+        {isGroup && (
+          <GroupInfoSheet
+            open={groupOpen}
+            onClose={() => setGroupOpen(false)}
+            chat={chat}
+            description={detail.description}
+            members={members}
+            myRole={myRole}
+            onChanged={refreshMembers}
+          />
+        )}
         {chat.peer && (
           <ProfileSheet
             open={profileOpen}

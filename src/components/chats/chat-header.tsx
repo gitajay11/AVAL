@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronLeft, Eye, Globe, Lock, Pin, X } from "lucide-react";
+import { ChevronLeft, Eye, Globe, Lock, Pin, Search, X } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { formatLastSeen, useMinute } from "@/lib/client/time";
 import type { ChatListItemDTO, MessageDTO } from "@/lib/chats/types";
@@ -19,6 +19,22 @@ function ContactLine({ chat, readOnly }: { chat: ChatListItemDTO; readOnly: bool
     <span className="flex items-center gap-1 truncate text-[13px] text-muted">
       <Icon className="size-3.5 shrink-0" aria-hidden="true" />
       {readOnly ? "View only · shared with you" : isPublic ? "Personal contact · public" : "Personal contact · private"}
+    </span>
+  );
+}
+
+/** Groups: who's typing, otherwise the member count. */
+function GroupLine({ chat, nameOf }: { chat: ChatListItemDTO; nameOf: (id: string | null) => string }) {
+  const typingUser = useTyping(chat.id);
+  return (
+    <span className="block truncate text-[13px] text-muted" aria-live="polite">
+      {typingUser ? (
+        <span className="inline-flex items-center gap-1.5 text-accent">
+          {nameOf(typingUser)} is typing <TypingDots />
+        </span>
+      ) : (
+        `${chat.memberCount ?? 0} members`
+      )}
     </span>
   );
 }
@@ -71,13 +87,15 @@ function StatusLine({ chat }: { chat: ChatListItemDTO }) {
 type HeaderProps = {
   chat: ChatListItemDTO;
   readOnly: boolean;
+  nameOf: (id: string | null) => string;
+  onSearch: () => void;
   pinned: MessageDTO | null;
   onOpenProfile: () => void;
   onJumpToPinned: () => void;
   onUnpin: () => void;
 };
 
-export function ChatHeader({ chat, readOnly, pinned, onOpenProfile, onJumpToPinned, onUnpin }: HeaderProps) {
+export function ChatHeader({ chat, readOnly, nameOf, onSearch, pinned, onOpenProfile, onJumpToPinned, onUnpin }: HeaderProps) {
   return (
     <header className="glass absolute inset-x-0 top-0 z-20 border-b border-line pt-[env(safe-area-inset-top)]">
       <div className="flex h-16 items-center gap-2 px-2 sm:px-4">
@@ -92,13 +110,27 @@ export function ChatHeader({ chat, readOnly, pinned, onOpenProfile, onJumpToPinn
           type="button"
           onClick={onOpenProfile}
           className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl py-1 pr-2 text-left hover:bg-surface-3/60"
-          aria-label={chat.contact ? (readOnly ? `About ${chat.title}` : `Manage ${chat.title}`) : `Open ${chat.title}'s profile`}
+          aria-label={chat.type === "GROUP" ? `${chat.title} info` : chat.contact ? (readOnly ? `About ${chat.title}` : `Manage ${chat.title}`) : `Open ${chat.title}'s profile`}
         >
           <Avatar name={chat.title} src={chat.avatarUrl} size={42} />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[16px] leading-tight font-bold">{chat.title}</span>
-            {chat.contact ? <ContactLine chat={chat} readOnly={readOnly} /> : <StatusLine chat={chat} />}
+            {chat.type === "GROUP" ? (
+              <GroupLine chat={chat} nameOf={nameOf} />
+            ) : chat.contact ? (
+              <ContactLine chat={chat} readOnly={readOnly} />
+            ) : (
+              <StatusLine chat={chat} />
+            )}
           </span>
+        </button>
+        <button
+          type="button"
+          onClick={onSearch}
+          className="grid size-10 shrink-0 place-items-center rounded-xl text-muted hover:bg-surface-3 hover:text-fg"
+          aria-label="Search in this chat"
+        >
+          <Search className="size-5" />
         </button>
       </div>
       <AnimatePresence initial={false}>

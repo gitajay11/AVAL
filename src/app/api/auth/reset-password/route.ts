@@ -23,6 +23,7 @@ export const POST = route(async (req) => {
     select: { email: true },
   });
   await revokeAllSessions(userId);
+  await db.pushSubscription.deleteMany({ where: { userId } });
   after(() => sendPasswordChangedEmail(user.email).catch((err) => console.error("[reset] notice failed", err)));
 
   const res = json({ ok: true });

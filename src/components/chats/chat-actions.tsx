@@ -9,6 +9,9 @@ export type ChatActions = {
   /** Viewing someone's shared contact: no menu, swipe, reactions or downloads. */
   readOnly: boolean;
   nameOf: (userId: string | null) => string;
+  /** Groups: show sender names and photos beside other people's messages. */
+  isGroup: boolean;
+  avatarOf: (userId: string | null) => string | null;
   retry: (clientId: string) => void;
   reply: (m: MessageDTO) => void;
   openMenu: (m: MessageDTO, point: { x: number; y: number }) => void;

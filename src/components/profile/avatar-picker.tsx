@@ -16,17 +16,19 @@ type Props = {
   avatarUrl: string | null;
   size?: number;
 } & (
-  | { contactId?: undefined; onChange: (me: Me) => void }
-  | { contactId: string; onChange: (contact: MyContactDTO) => void }
+  | { contactId?: undefined; chatId?: undefined; onChange: (me: Me) => void }
+  | { contactId: string; chatId?: undefined; onChange: (contact: MyContactDTO) => void }
+  | { chatId: string; contactId?: undefined; onChange: () => void }
 );
 
 /**
  * Tap the photo to choose a new one; a preview shows immediately while it
- * uploads. Sets my own photo, or a personal contact's with `contactId`.
+ * uploads. Sets my own photo, a personal contact's (`contactId`) or a group's (`chatId`).
  */
 export function AvatarPicker({ name, avatarUrl, size = 112, ...target }: Props) {
   const apply = (r: { user?: Me; contact?: MyContactDTO }) => {
-    if (target.contactId !== undefined) {
+    if (target.chatId !== undefined) target.onChange();
+    else if (target.contactId !== undefined) {
       if (r.contact) target.onChange(r.contact);
     } else if (r.user) target.onChange(r.user);
   };
@@ -43,7 +45,7 @@ export function AvatarPicker({ name, avatarUrl, size = 112, ...target }: Props) 
     setPreview(local);
     setBusy(true);
     try {
-      apply(await uploadAvatar(file, target.contactId));
+      apply(await uploadAvatar(file, { contactId: target.contactId, chatId: target.chatId }));
       toast("Photo updated");
     } catch (err) {
       toast(err instanceof ClientApiError ? err.message : "Upload failed.", "error");
@@ -57,7 +59,10 @@ export function AvatarPicker({ name, avatarUrl, size = 112, ...target }: Props) 
   async function onRemove() {
     setBusy(true);
     try {
-      if (target.contactId !== undefined) {
+      if (target.chatId !== undefined) {
+        await api(`/api/chats/${target.chatId}/group`, { method: "PATCH", body: { removeAvatar: true } });
+        apply({});
+      } else if (target.contactId !== undefined) {
         const r = await api<{ contact: MyContactDTO }>(`/api/contacts/${target.contactId}`, { method: "PATCH", body: { removeAvatar: true } });
         apply(r);
       } else {

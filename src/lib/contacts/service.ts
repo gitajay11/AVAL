@@ -5,6 +5,7 @@ import { blockedAmong } from "@/lib/authz/privacy";
 import { db } from "@/lib/db";
 import { deleteAttachments } from "@/lib/media/storage";
 import { deleteObject } from "@/lib/r2";
+import { pushAccessEvent } from "@/lib/push/notify";
 import { publishToUsers } from "@/lib/realtime/server";
 import { avatarUrl } from "@/lib/users";
 import { requestState } from "./policy";
@@ -57,6 +58,11 @@ export async function notify(userId: string, type: NotificationDTO["type"], payl
     ...(type === "ACCESS_REQUEST" ? { actionable: true } : {}),
   };
   await publishToUsers([userId], "notification.new", { notification });
+  if (type === "ACCESS_REQUEST") {
+    await pushAccessEvent(userId, "Access request", `${payload.user?.displayName ?? "Someone"} asked to view “${payload.contactName}”`, "/notifications");
+  } else if (type === "ACCESS_APPROVED" && payload.chatId) {
+    await pushAccessEvent(userId, "Request approved", `You can now view “${payload.contactName}”`, `/chats/${payload.chatId}`);
+  }
 }
 
 async function announceAccess(userIds: string[], contactId: string, chatId: string, access: "granted" | "revoked") {

@@ -30,9 +30,12 @@ async function toSquareWebp(file: File): Promise<Blob> {
 
 /**
  * Presign → PUT straight to R2 → confirm (server verifies size and file signature).
- * With `contactId`, sets the photo of one of my personal contacts instead of mine.
+ * With `contactId` / `chatId`, sets a personal contact's or a group's photo instead of mine.
  */
-export async function uploadAvatar(file: File, contactId?: string): Promise<{ user?: Me; contact?: MyContactDTO }> {
+export async function uploadAvatar(
+  file: File,
+  target: { contactId?: string; chatId?: string } = {},
+): Promise<{ user?: Me; contact?: MyContactDTO }> {
   if (!file.type.startsWith("image/")) throw new ClientApiError(0, "type", "Choose an image file.");
   if (file.size > 25 * 1024 * 1024) throw new ClientApiError(0, "size", "That image is too large.");
 
@@ -41,7 +44,7 @@ export async function uploadAvatar(file: File, contactId?: string): Promise<{ us
 
   const { uploadId, url, headers } = await api<{ uploadId: string; url: string; headers: Record<string, string> }>(
     "/api/uploads/avatar",
-    { body: { contentType: blob.type, size: blob.size, contactId } },
+    { body: { contentType: blob.type, size: blob.size, ...target } },
   );
 
   const put = await fetch(url, { method: "PUT", headers, body: blob }).catch(() => null);

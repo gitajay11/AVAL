@@ -4,6 +4,7 @@ import { directPeerId } from "@/lib/authz/chats";
 import { getChatAccess } from "@/lib/authz/contacts";
 import { hasBlocked } from "@/lib/authz/privacy";
 import { db } from "@/lib/db";
+import { listMembers } from "@/lib/groups/service";
 import { getChatItem, getViewerChatItem, latestPinned, listMessagesBefore } from "./queries";
 import { cantSendReason } from "./service";
 import type { ChatDetailDTO } from "./types";
@@ -34,13 +35,17 @@ export async function getChatDetail(me: SessionUser, chatId: string): Promise<Ch
       blockedByMe: false,
       receipts: [],
       pinned,
+      members: null,
+      myRole: null,
+      description: null,
       page,
     };
   }
 
   const m = access.membership;
   const peerId = directPeerId(m, me.id);
-  const [chat, page, receipts, reason, pinned, blockedByMe] = await Promise.all([
+  const isGroup = m.chat.type === "GROUP";
+  const [chat, page, receipts, reason, pinned, blockedByMe, members, group] = await Promise.all([
     getChatItem(me.id, chatId),
     listMessagesBefore(me.id, chatId, m.clearedAt, null),
     m.chat.type === "CONTACT"
@@ -49,6 +54,8 @@ export async function getChatDetail(me: SessionUser, chatId: string): Promise<Ch
     cantSendReason(me, m),
     latestPinned(me.id, chatId, m.clearedAt),
     peerId ? hasBlocked(me.id, peerId) : Promise.resolve(false),
+    isGroup ? listMembers(me.id, chatId) : Promise.resolve(null),
+    isGroup ? db.chat.findUnique({ where: { id: chatId }, select: { description: true } }) : Promise.resolve(null),
   ]);
   if (!chat) return null;
   const mine = await db.receipt.findUnique({ where: { chatId_userId: { chatId, userId: me.id } }, select: { lastReadAt: true } });
@@ -59,14 +66,22 @@ export async function getChatDetail(me: SessionUser, chatId: string): Promise<Ch
     canSend: reason === null,
     cantSendReason: reason,
     blockedByMe,
-    receipts: receipts
-      .filter((r) => r.userId !== me.id)
-      .map((r) => ({
-        userId: r.userId,
-        lastDeliveredAt: r.lastDeliveredAt?.toISOString() ?? null,
-        lastReadAt: r.lastReadAt?.toISOString() ?? null,
-      })),
+    // One entry per other member (even those with no receipt row yet), so a
+    // group message only shows ✓✓ once everyone has received / read it.
+    receipts: (members ? members.map((x) => x.id) : receipts.map((r) => r.userId))
+      .filter((userId) => userId !== me.id)
+      .map((userId) => {
+        const r = receipts.find((x) => x.userId === userId);
+        return {
+          userId,
+          lastDeliveredAt: r?.lastDeliveredAt?.toISOString() ?? null,
+          lastReadAt: r?.lastReadAt?.toISOString() ?? null,
+        };
+      }),
     pinned,
+    members,
+    myRole: isGroup ? m.role : null,
+    description: group?.description ?? null,
     page,
   };
 }

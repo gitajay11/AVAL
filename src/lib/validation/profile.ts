@@ -31,6 +31,8 @@ export const AvatarUploadSchema = z.object({
   contentType: z.enum(AVATAR_TYPES),
   /** Set to upload a photo for one of my personal contacts instead of myself. */
   contactId: z.uuid().optional(),
+  /** Set to upload a group's photo (admins only). */
+  chatId: z.uuid().optional(),
   size: z.number().int().positive().max(AVATAR_MAX_BYTES, "Avatar must be 5 MB or smaller"),
 });
 

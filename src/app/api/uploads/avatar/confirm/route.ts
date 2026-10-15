@@ -2,6 +2,7 @@ import { ApiError, json, parseJson, route } from "@/lib/api";
 import { requireSession } from "@/lib/auth/session";
 import { requireOwnedContact } from "@/lib/authz/contacts";
 import { getContactDetail } from "@/lib/contacts/service";
+import { groupPhotoChanged, requireGroupAdmin } from "@/lib/groups/service";
 import { db } from "@/lib/db";
 import { sniffMime } from "@/lib/media/sniff";
 import { deleteObject, headObject, readHead, UPLOAD_URL_TTL_SECONDS } from "@/lib/r2";
@@ -46,6 +47,21 @@ export const POST = route(async (req) => {
     ]);
     if (contact.avatarKey) await deleteObject(contact.avatarKey);
     return json({ contact: (await getContactDetail(user.id, contactId)).contact });
+  }
+
+  // A group photo: admin rights are re-checked now.
+  if (upload.objectKey.startsWith("groups/")) {
+    const chatId = upload.objectKey.split("/")[1];
+    await requireGroupAdmin(user.id, chatId);
+    const before = await db.chat.findUniqueOrThrow({ where: { id: chatId }, select: { avatarKey: true } });
+    await db.$transaction([
+      db.attachment.update({ where: { id: upload.id }, data: { status: "READY" } }),
+      db.chat.update({ where: { id: chatId }, data: { avatarKey: upload.objectKey } }),
+      ...(before.avatarKey ? [db.attachment.deleteMany({ where: { objectKey: before.avatarKey } })] : []),
+    ]);
+    if (before.avatarKey) await deleteObject(before.avatarKey);
+    await groupPhotoChanged(user, chatId);
+    return json({ ok: true });
   }
 
   const previous = await db.user.findUniqueOrThrow({ where: { id: user.id }, select: { avatarKey: true } });

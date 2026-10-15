@@ -9,6 +9,7 @@ import { NotificationsProvider } from "@/components/notifications/notifications-
 import { RealtimeProvider } from "@/components/realtime/realtime-provider";
 import { cn } from "@/lib/cn";
 import type { ChatListItemDTO } from "@/lib/chats/types";
+import { ServiceWorker } from "./service-worker";
 import { UserProvider, type ClientUser } from "./user-context";
 
 /**
@@ -29,6 +30,7 @@ export function AppShell({
 
   return (
     <UserProvider user={user}>
+      <ServiceWorker />
       <RealtimeProvider userId={user.id}>
         <ChatsProvider meId={user.id} initialChats={initialChats}>
           <NotificationsProvider>

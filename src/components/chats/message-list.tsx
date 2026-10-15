@@ -10,6 +10,7 @@ import { MessageBubble, type Receipt } from "./message-bubble";
 
 type ListContext = {
   loadingOlder: boolean;
+  loadingNewer: boolean;
   reachedStart: boolean;
   footerHeight: number;
   headerExtra: number;
@@ -32,7 +33,11 @@ function Header({ context }: { context?: ListContext }) {
 }
 
 function Footer({ context }: { context?: ListContext }) {
-  return <div style={{ height: (context?.footerHeight ?? 80) + 8 }} />;
+  return (
+    <div style={{ height: (context?.footerHeight ?? 80) + 8 }} className="flex justify-center pt-2">
+      {context?.loadingNewer && <Spinner className="size-5 text-subtle" />}
+    </div>
+  );
 }
 
 const DaySeparator = memo(function DaySeparator({ iso }: { iso: string }) {
@@ -68,6 +73,8 @@ type Props = {
   receiptFor: (m: UiMessage) => Receipt;
   shouldAnimate: (key: string) => boolean;
   onStartReached: () => void;
+  onEndReached: () => void;
+  loadingNewer: boolean;
   onAtBottomChange: (atBottom: boolean) => void;
 };
 
@@ -76,7 +83,7 @@ type Props = {
  * prepended by lowering `firstItemIndex`, which keeps the scroll position fixed.
  */
 export const MessageList = forwardRef<VirtuosoHandle, Props>(function MessageList(
-  { items, firstItemIndex, initialIndex, meId, loadingOlder, reachedStart, footerHeight, highlightedId, headerExtra, receiptFor, shouldAnimate, onStartReached, onAtBottomChange },
+  { items, firstItemIndex, initialIndex, meId, loadingOlder, reachedStart, footerHeight, highlightedId, headerExtra, receiptFor, shouldAnimate, onStartReached, onEndReached, loadingNewer, onAtBottomChange },
   ref,
 ) {
   return (
@@ -92,8 +99,9 @@ export const MessageList = forwardRef<VirtuosoHandle, Props>(function MessageLis
       atBottomThreshold={96}
       atBottomStateChange={onAtBottomChange}
       startReached={onStartReached}
+      endReached={onEndReached}
       increaseViewportBy={{ top: 800, bottom: 400 }}
-      context={{ loadingOlder, reachedStart, footerHeight, headerExtra }}
+      context={{ loadingOlder, loadingNewer, reachedStart, footerHeight, headerExtra }}
       components={{ Header, Footer }}
       itemContent={(_, item) => {
         if (item.kind === "day") return <DaySeparator iso={item.iso} />;

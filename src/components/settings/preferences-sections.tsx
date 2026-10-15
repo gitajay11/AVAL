@@ -8,6 +8,7 @@ import { useToast } from "@/components/ui/toast";
 import { api, ClientApiError } from "@/lib/client/api";
 import type { Me } from "@/lib/users";
 import type { AUDIENCES } from "@/lib/validation/profile";
+import { PushToggle } from "./push-toggle";
 import { Divider, Section } from "./section";
 
 type Audience = (typeof AUDIENCES)[number];
@@ -66,6 +67,8 @@ export function PrivacyAndNotifications({ me, onChange }: { me: Me; onChange: (m
       </Section>
 
       <Section id="notifications" title="Notifications">
+        <PushToggle />
+        <Divider />
         <Switch
           label="New messages"
           description="Push notifications for messages in chats you haven't muted."

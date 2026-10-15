@@ -9,6 +9,7 @@ import { db, uniqueViolation } from "@/lib/db";
 import { attachLinkPreview, firstUrl } from "@/lib/link-preview";
 import { deleteAttachments } from "@/lib/media/storage";
 import { touchLastSeen } from "@/lib/presence";
+import { pushNewMessage } from "@/lib/push/notify";
 import { publishToUsers } from "@/lib/realtime/server";
 import { EDIT_WINDOW_MS, MAX_PINNED_CHATS } from "@/lib/validation/chat";
 import { broadcast, rebroadcast } from "./broadcast";
@@ -136,7 +137,7 @@ export async function sendMessage(
     type = TYPE_FOR_KIND[a.kind] ?? "FILE";
   }
   if (input.replyToId) {
-    const target = await db.message.findFirst({ where: { id: input.replyToId, chatId: m.chat.id }, select: { id: true } });
+    const target = await db.message.findFirst({ where: { id: input.replyToId, chatId: m.chat.id, type: { not: "SYSTEM" } }, select: { id: true } });
     if (!target) throw new ApiError(400, "bad_reply", "The message you replied to is gone.");
   }
 
@@ -172,6 +173,7 @@ export async function sendMessage(
 
   const dto = (await getMessage(me.id, created.id))!;
   await Promise.all([broadcast("message.new", dto), touchLastSeen(me.id)]);
+  after(() => pushNewMessage(dto));
   if (input.text && firstUrl(input.text)) after(() => attachLinkPreview(me.id, created.id));
   return dto;
 }
@@ -180,6 +182,7 @@ export async function sendMessage(
 export async function forwardMessage(me: Me, messageId: string, chatIds: string[]): Promise<string[]> {
   const { message } = await requireMessage(me.id, messageId);
   if (message.deletedAt) throw new ApiError(400, "deleted", "That message was deleted.");
+  if (message.type === "SYSTEM") throw new ApiError(400, "system", "That can't be forwarded.");
   const source = await db.message.findUniqueOrThrow({
     where: { id: messageId },
     select: {
@@ -233,6 +236,7 @@ export async function forwardMessage(me: Me, messageId: string, chatIds: string[
     });
     const dto = (await getMessage(me.id, row.id))!;
     await broadcast("message.new", dto);
+    after(() => pushNewMessage(dto));
     sent.push(row.id);
   }
   return sent;
@@ -243,7 +247,7 @@ export async function forwardMessage(me: Me, messageId: string, chatIds: string[
 /** Edit my own message's text (or caption) within 48 hours. */
 export async function editMessage(me: Me, messageId: string, text: string): Promise<MessageDTO> {
   const { message, membership } = await requireMessage(me.id, messageId);
-  if (message.senderId !== me.id) throw new ApiError(403, "not_owner", "You can only edit your own messages.");
+  if (message.senderId !== me.id || message.type === "SYSTEM") throw new ApiError(403, "not_owner", "You can only edit your own messages.");
   if (message.deletedAt) throw new ApiError(400, "deleted", "That message was deleted.");
   if (Date.now() - message.createdAt.getTime() > EDIT_WINDOW_MS) {
     throw new ApiError(400, "too_old", "Messages can only be edited for 48 hours.");
@@ -265,8 +269,12 @@ export async function editMessage(me: Me, messageId: string, text: string): Prom
 
 /** Delete my message for everyone: content, media and reactions are removed; a placeholder remains. */
 export async function deleteForEveryone(meId: string, messageId: string): Promise<MessageDTO> {
-  const { message } = await requireMessage(meId, messageId);
-  if (message.senderId !== meId) throw new ApiError(403, "not_owner", "You can only delete your own messages for everyone.");
+  const { message, membership } = await requireMessage(meId, messageId);
+  // Your own messages anywhere; in groups, admins may also delete anyone's.
+  const groupAdmin = membership.chat.type === "GROUP" && (membership.role === "OWNER" || membership.role === "ADMIN");
+  if (message.type === "SYSTEM" || (message.senderId !== meId && !groupAdmin)) {
+    throw new ApiError(403, "not_owner", "You can only delete your own messages for everyone.");
+  }
   if (!message.deletedAt) {
     await db.$transaction([
       db.message.update({
@@ -297,6 +305,7 @@ export async function hideForMe(meId: string, messageId: string) {
 export async function setReaction(me: Me, messageId: string, emoji: string | null) {
   const { message, membership } = await requireMessage(me.id, messageId);
   if (message.deletedAt) throw new ApiError(400, "deleted", "That message was deleted.");
+  if (message.type === "SYSTEM") throw new ApiError(400, "system", "You can't react to that.");
   const peerId = directPeerId(membership, me.id);
   if (peerId && (await isBlockedEitherWay(me.id, peerId))) throw new ApiError(403, "blocked", "You can't react in this chat.");
 
@@ -314,8 +323,12 @@ export async function setReaction(me: Me, messageId: string, emoji: string | nul
 
 /** Pin or unpin a message for everyone in the chat. */
 export async function setPinned(meId: string, messageId: string, pinned: boolean): Promise<MessageDTO> {
-  const { message } = await requireMessage(meId, messageId);
+  const { message, membership } = await requireMessage(meId, messageId);
   if (message.deletedAt) throw new ApiError(400, "deleted", "That message was deleted.");
+  if (message.type === "SYSTEM") throw new ApiError(400, "system", "That can't be pinned.");
+  if (membership.chat.type === "GROUP" && membership.role === "MEMBER") {
+    throw new ApiError(403, "not_admin", "Only group admins can pin messages.");
+  }
   await db.message.update({
     where: { id: messageId },
     data: pinned ? { pinnedAt: new Date(), pinnedById: meId } : { pinnedAt: null, pinnedById: null },

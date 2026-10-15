@@ -19,6 +19,7 @@ type Action =
   | { type: "message"; message: MessageDTO; meId: string; countUnread: boolean }
   | { type: "updated"; message: MessageDTO }
   | { type: "read"; chatId: string }
+  | { type: "remove"; chatId: string }
   | { type: "settings"; chatId: string; settings: Partial<ChatSettingsDTO> }
   | { type: "receipt"; chatId: string; userId: string; lastDeliveredAt: string | null; lastReadAt: string | null };
 
@@ -70,6 +71,8 @@ function reducer(state: State, action: Action): State {
       return map(action.message.chatId, (c) => (c.lastMessage?.id === action.message.id ? { ...c, lastMessage: lastOf(action.message) } : c));
     case "read":
       return map(action.chatId, (c) => ({ ...c, unread: 0, markedUnread: false }));
+    case "remove":
+      return { chats: state.chats.filter((c) => c.id !== action.chatId) };
     case "settings": {
       const next = map(action.chatId, (c) => ({ ...c, ...action.settings }));
       return { chats: sortChats(next.chats) };
@@ -231,6 +234,9 @@ export function ChatsProvider({
         break;
       case "chat.read":
         dispatch({ type: "read", chatId: e.data.chatId });
+        break;
+      case "chat.removed":
+        dispatch({ type: "remove", chatId: e.data.chatId });
         break;
       case "chat.settings": {
         const { chatId, ...settings } = e.data;

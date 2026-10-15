@@ -25,9 +25,11 @@ function preview(chat: ChatListItemDTO, meId: string): React.ReactNode {
   const m = chat.lastMessage;
   if (!m) return <span className="italic">No messages yet</span>;
   const body = m.deleted ? <span className="italic">Message deleted</span> : snippetOf(m);
-  return m.senderId === meId ? (
+  if (m.type === "SYSTEM") return <span className="italic">{body}</span>;
+  const who = m.senderId === meId ? "You" : chat.type === "GROUP" ? m.senderName : null;
+  return who ? (
     <>
-      <span className="text-fg/80">You: </span>
+      <span className="text-fg/80">{who}: </span>
       {body}
     </>
   ) : (

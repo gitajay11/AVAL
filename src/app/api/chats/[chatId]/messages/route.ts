@@ -4,7 +4,8 @@ import { requireMembership } from "@/lib/authz/chats";
 import { accessChatId, accessClearedAt, requireChatAccess } from "@/lib/authz/contacts";
 import { decodeCursor } from "@/lib/chats/cursor";
 import { db } from "@/lib/db";
-import { listMessagesAfter, listMessagesBefore } from "@/lib/chats/queries";
+import { listMessagesAfter, listMessagesAround, listMessagesBefore } from "@/lib/chats/queries";
+import { uuid } from "@/lib/validation/common";
 import { sendMessage } from "@/lib/chats/service";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { SendMessageSchema } from "@/lib/validation/chat";
@@ -14,7 +15,8 @@ type Ctx = RouteContext<"/api/chats/[chatId]/messages">;
 /**
  * GET ?before=<cursor> → older page (30). GET ?after=<cursor> → newer messages
  * plus the other members' receipts (catch-up after a reconnect, and polling
- * when real-time is unavailable). Neither → latest page.
+ * when real-time is unavailable). GET ?around=<messageId> → a window around one
+ * message, with cursors both ways. None → latest page.
  */
 export const GET = route<Ctx>(async (req, ctx) => {
   const { user } = await requireSession();
@@ -24,6 +26,12 @@ export const GET = route<Ctx>(async (req, ctx) => {
   const clearedAt = accessClearedAt(access);
   const params = req.nextUrl.searchParams;
 
+  if (params.has("around")) {
+    const id = uuid.safeParse(params.get("around"));
+    const window = id.success ? await listMessagesAround(user.id, chatId, clearedAt, id.data) : null;
+    if (!window) throw new ApiError(404, "not_found", "Message not found.");
+    return json(window);
+  }
   if (params.has("after")) {
     const after = decodeCursor(params.get("after"));
     if (!after) throw new ApiError(400, "bad_cursor", "Invalid cursor.");

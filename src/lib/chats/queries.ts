@@ -2,10 +2,12 @@ import "server-only";
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { contactAvatarUrl } from "@/lib/contacts/urls";
+import { groupAvatarUrl } from "@/lib/groups/urls";
 import { avatarUrl } from "@/lib/users";
 import { PAGE_SIZE } from "@/lib/validation/chat";
 import { encodeCursor, type Cursor } from "./cursor";
 import type {
+  MessageWindow,
   AttachmentDTO,
   ChatListItemDTO,
   LinkPreviewDTO,
@@ -32,6 +34,9 @@ type ChatRow = {
   lm_text: string | null;
   lm_created_at: Date | null;
   lm_deleted_at: Date | null;
+  lm_sender_name: string | null;
+  avatar_key: string | null;
+  member_count: number | null;
   peer_id: string | null;
   peer_username: string | null;
   peer_display_name: string | null;
@@ -59,7 +64,9 @@ function chatRows(me: string, opts: { chatId?: string; limit: number }) {
     : Prisma.sql`AND (c.last_message_at IS NOT NULL OR c.type = 'CONTACT')`;
   return db.$queryRaw<ChatRow[]>`
     SELECT
-      c.id, c.type::text AS type, c.title, c.created_at, c.last_message_at,
+      c.id, c.type::text AS type, c.title, c.avatar_key, c.created_at, c.last_message_at,
+      lu.display_name AS lm_sender_name,
+      CASE WHEN c.type = 'GROUP' THEN (SELECT count(*)::int FROM chat_members gm WHERE gm.chat_id = c.id) END AS member_count,
       cm.pinned_at, cm.archived_at, cm.muted_until, cm.marked_unread,
       lm.id AS lm_id, lm.sender_id AS lm_sender_id, lm.type::text AS lm_type, lm.text AS lm_text,
       lm.created_at AS lm_created_at, lm.deleted_at AS lm_deleted_at,
@@ -111,6 +118,7 @@ function chatRows(me: string, opts: { chatId?: string; limit: number }) {
     ) p ON c.type = 'DIRECT'
     LEFT JOIN receipts pr ON pr.chat_id = c.id AND pr.user_id = p.id
     LEFT JOIN personal_contacts pc ON pc.id = c.contact_id
+    LEFT JOIN users lu ON lu.id = lm.sender_id AND c.type = 'GROUP'
     WHERE cm.user_id = ${me}::uuid ${only}
     ORDER BY cm.pinned_at DESC NULLS LAST, COALESCE(c.last_message_at, c.created_at) DESC, c.id DESC
     LIMIT ${opts.limit}
@@ -130,7 +138,12 @@ function toChatItem(r: ChatRow): ChatListItemDTO {
     id: r.id,
     type: r.type,
     title: r.title ?? r.contact_name ?? peer?.displayName ?? "Chat",
-    avatarUrl: r.contact_id ? contactAvatarUrl(r.contact_id, r.contact_avatar_key) : (peer?.avatarUrl ?? null),
+    avatarUrl: r.contact_id
+      ? contactAvatarUrl(r.contact_id, r.contact_avatar_key)
+      : r.type === "GROUP"
+        ? groupAvatarUrl(r.id, r.avatar_key)
+        : (peer?.avatarUrl ?? null),
+    memberCount: r.member_count,
     peer,
     contact: r.contact_id ? { id: r.contact_id, visibility: r.contact_visibility! } : null,
     lastMessage: r.lm_id
@@ -141,6 +154,7 @@ function toChatItem(r: ChatRow): ChatListItemDTO {
           text: r.lm_deleted_at ? null : r.lm_text,
           createdAt: r.lm_created_at!.toISOString(),
           deleted: r.lm_deleted_at !== null,
+          senderName: r.lm_sender_name,
         }
       : null,
     lastActivityAt: (r.last_message_at ?? r.created_at).toISOString(),
@@ -186,6 +200,7 @@ export async function getViewerChatItem(
     title: contact.name,
     avatarUrl: contactAvatarUrl(contact.id, contact.avatarKey),
     peer: null,
+    memberCount: null,
     contact: { id: contact.id, visibility: contact.visibility },
     lastMessage: last
       ? { id: last.id, senderId: null, type: last.type, text: last.deletedAt ? null : last.text, createdAt: last.createdAt.toISOString(), deleted: last.deletedAt !== null }
@@ -373,4 +388,36 @@ export async function latestPinned(me: string, chatId: string, clearedAt: Date |
     select: messageSelect(me),
   });
   return row ? toMessage(row) : null;
+}
+
+const AROUND = 15;
+
+/**
+ * Up to 15 messages either side of `messageId` (which must be visible to me),
+ * with cursors to keep paging in both directions. Null if it isn't visible.
+ */
+export async function listMessagesAround(
+  me: string,
+  chatId: string,
+  clearedAt: Date | null,
+  messageId: string,
+): Promise<MessageWindow | null> {
+  const target = await db.message.findFirst({
+    where: { id: messageId, chatId, AND: [visibleTo(me, clearedAt)] },
+    select: messageSelect(me),
+  });
+  if (!target) return null;
+  const at = { createdAt: target.createdAt, id: target.id };
+  const [older, newer] = await Promise.all([
+    listMessagesBefore(me, chatId, clearedAt, at, AROUND),
+    listMessagesAfter(me, chatId, clearedAt, at, AROUND + 1),
+  ]);
+  const hasNewer = newer.length > AROUND;
+  const newerShown = newer.slice(0, AROUND);
+  const lastShown = newerShown.at(-1) ?? toMessage(target);
+  return {
+    messages: [...older.messages, toMessage(target), ...newerShown],
+    olderCursor: older.olderCursor,
+    newerCursor: hasNewer ? encodeCursor(lastShown) : null,
+  };
 }

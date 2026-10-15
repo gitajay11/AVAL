@@ -2,7 +2,7 @@
 
 A Telegram-style chat PWA. Next.js 16 (App Router) + Tailwind v4 + Motion on Vercel, Neon Postgres via Prisma 7, Ably for real-time, Cloudflare R2 for media, Upstash for rate limiting.
 
-**Status: Phase 4 — personal contacts and access requests.** Checklists: [phase 1](docs/phase-1-checklist.md), [phase 2](docs/phase-2-checklist.md), [phase 3](docs/phase-3-checklist.md), [phase 4](docs/phase-4-checklist.md).
+**Status: Phase 5 — groups, message search and push notifications.** Checklists: [phase 1](docs/phase-1-checklist.md), [phase 2](docs/phase-2-checklist.md), [phase 3](docs/phase-3-checklist.md), [phase 4](docs/phase-4-checklist.md), [phase 5](docs/phase-5-checklist.md).
 
 ## Architecture in one screen
 
@@ -17,6 +17,9 @@ A Telegram-style chat PWA. Next.js 16 (App Router) + Tailwind v4 + Motion on Ver
 | Media | Images are downscaled and re-encoded in the browser (strips EXIF/GPS). Upload = presigned PUT that signs exact `Content-Type` + `Content-Length` → confirm checks size and real file signature (images, video, audio) → attach to a message. Reads go through `/api/media/:id`, which checks chat membership, deletion and "delete for me", then redirects to a 1-hour signed URL. Plain files are always served as downloads. Forwarded media share the R2 object; objects are deleted when no attachment references them. |
 | Link previews | Fetched server-side after sending, with an SSRF guard at connect time (every resolved IP checked, private/link-local/metadata ranges refused, ports 80/443 only, redirects re-validated, 512 KB cap, 5 s timeout). The page's image is copied into R2, so browsers never load third-party URLs. |
 | Personal contacts | A contact is a one-way chat (type `CONTACT`, the owner is its only member). Who may see it is decided in one pure function, [`contactRole`](src/lib/contacts/policy.ts): owner, viewer (approved and still public), discoverable (public: name and photo only) or hidden (private, or blocked either way). Every route goes through [src/lib/authz/contacts.ts](src/lib/authz/contacts.ts). Viewers get read access via `getChatAccess`; every write still requires chat membership, so they're read-only by construction (no sending, reacting, forwarding, starring or downloads). Going Private, revoking, blocking or deleting ends access on the next request, and real-time recipients are recomputed per event. |
+| Groups | Up to 200 members with roles owner / admin / member ([src/lib/groups/service.ts](src/lib/groups/service.ts)). Adding someone follows their *Who can message me* setting and blocks, exactly like starting a 1:1 chat. Admins edit name, description and photo and add or remove members; only the owner promotes or demotes admins or removes an admin. If the owner leaves, ownership passes to the longest-standing admin (else member); the last one out deletes the group and its media. Every change is posted as a system line. Members' photos follow each person's photo privacy. |
+| Search | Postgres full-text search on `messages.search_vector` (GIN index, `simple` config, trigger-maintained). The query is rebuilt from letters and digits only ([src/lib/search/tsquery.ts](src/lib/search/tsquery.ts)), so user input can never inject tsquery operators. In-chat search uses the same access check as reading the chat; global search joins on my memberships and applies "clear history" and "delete for me" in the same query. Keyset-paginated, rate-limited. Picking a result loads a window around that message (`?around=`) and lets you scroll both ways. |
+| Push | Web Push with VAPID ([src/lib/push](src/lib/push)). Subscriptions are per device (HTTPS endpoints only) and removed on sign-out, "sign out everywhere", password reset, and when the push service answers 404/410. Not sent for muted chats, personal contacts, your own messages, blocked people, or when *New messages* is off; *Show message preview* controls whether text is included. The service worker shows nothing when that chat is already open and focused, and offers **Reply** (posts with your cookie, same authorization as the app) and **Open**. |
 | Receipts | Per-member watermarks in `receipts`: *delivered* advances when the chat list loads or a message reaches a device; *read* when the chat is open and scrolled to the bottom. ✓ sent, ✓✓ delivered, green ✓✓ read. |
 | Client storage | None. No localStorage/IndexedDB; the only JS-readable cookie is the theme preference. Logout sends `Clear-Site-Data: "cache"` and empties Cache Storage. |
 | Rendering | Cache Components: each page prerenders a static shell; session-dependent parts stream inside `<Suspense>`. `proxy.ts` only does optimistic redirects. |
@@ -58,6 +61,8 @@ pnpm db:seed
 
 To try two users at once, use a normal and a private window (cookies are per profile).
 
+Push locally: add VAPID keys to `.env` (see Cloud services) and use Chrome or Edge on `http://localhost:3000` (a secure context). Settings → Notifications → **Push on this device**. Browsers deliver through their real push service, so your machine needs internet access.
+
 Media locally: run any S3-compatible server and point `R2_ENDPOINT` at it (it's also added to the CSP in development). For example with [s3rver](https://github.com/jamhall/s3rver) and a CORS file allowing `PUT`/`GET` from `http://localhost:3000`:
 
 ```bash
@@ -88,6 +93,11 @@ pnpm lint
 4. **Ably** — create an app and copy its root API key to `ABLY_API_KEY` (keep it server-side). For instant online/offline updates, add a webhook under **Integrations → Webhooks**: URL `https://YOUR-DOMAIN/api/realtime/webhook`, source **Presence**, channel filter `^user:`, **enveloped** and **signed with the same key**. Without the webhook, status still refreshes every 30 s.
 5. **SMTP** — any provider (Resend, Postmark, SES, Brevo…). Use a verified sending domain in `SMTP_FROM`.
 6. **CRON_SECRET** — any long random string.
+7. **Web Push** — generate a key pair once and set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` (a `mailto:` you read):
+   ```bash
+   npx web-push generate-vapid-keys
+   ```
+   Keep the same keys forever; changing them silently breaks every existing subscription. On iPhone and iPad, push works only after **Add to Home Screen** (iOS 16.4+).
 
 ## Deploy to Vercel
 
@@ -116,6 +126,10 @@ src/app/api/                route handlers (auth, me, uploads, media, cron)
 src/lib/                    server libs: db, env, api helpers, auth, security, r2, mail
 src/lib/chats/              chat queries, services, receipts, cursor, timeline, shared types
 src/lib/contacts/           contact access policy, service (requests, grants, notifications), types
+src/lib/groups/             group service (create, members, roles, leave), avatar URLs
+src/lib/search/             tsquery builder, in-chat and global message search
+src/lib/push/               VAPID sender (cleans dead subscriptions), message/access-request notifications
+public/sw.js                service worker: push, notification Reply/Open (no data caching)
 src/lib/media/              upload policy, signature sniffing, uploads, ref-counted deletion
 src/lib/link-preview.ts     SSRF-safe preview fetcher (pure parsing in link-meta.ts)
 src/lib/realtime/           Ably token + server-side publishing

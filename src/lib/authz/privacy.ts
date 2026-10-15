@@ -9,13 +9,19 @@ export function directKey(a: string, b: string): string {
 
 /**
  * Privacy "contacts": `ownerId` counts `viewerId` as a contact once the owner has
- * sent them a message (in their 1:1 chat). Group chats will count too (phase 5).
+ * messaged them: in their 1:1 chat, or in a group they're both in.
  */
 export async function hasMessaged(ownerId: string, viewerId: string): Promise<boolean> {
   const chat = await db.chat.findUnique({ where: { directKey: directKey(ownerId, viewerId) }, select: { id: true } });
-  if (!chat) return false;
-  const msg = await db.message.findFirst({ where: { chatId: chat.id, senderId: ownerId }, select: { id: true } });
-  return msg !== null;
+  if (chat) {
+    const direct = await db.message.findFirst({ where: { chatId: chat.id, senderId: ownerId }, select: { id: true } });
+    if (direct) return true;
+  }
+  const inGroup = await db.message.findFirst({
+    where: { senderId: ownerId, type: { not: "SYSTEM" }, chat: { type: "GROUP", members: { some: { userId: viewerId } } } },
+    select: { id: true },
+  });
+  return inGroup !== null;
 }
 
 /** True if `blocker` has blocked `blocked`. */
