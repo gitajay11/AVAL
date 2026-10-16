@@ -35,7 +35,9 @@ let cached: Env | undefined;
 /** Validated server env. Read lazily so `next build` works without secrets. */
 export function env(): Env {
   if (cached) return cached;
-  const parsed = EnvSchema.safeParse(process.env);
+  // Blank values count as unset, so .env.local can switch a live integration off with KEY="".
+  const present = Object.fromEntries(Object.entries(process.env).filter(([, v]) => v !== ""));
+  const parsed = EnvSchema.safeParse(present);
   if (!parsed.success) {
     const fields = parsed.error.issues.map((i) => i.path.join(".")).join(", ");
     throw new Error(`Invalid or missing environment variables: ${fields}`);

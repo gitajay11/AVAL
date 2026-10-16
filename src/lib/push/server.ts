@@ -14,7 +14,7 @@ export function pushConfig(): { publicKey: string } | null {
   const privateKey = process.env.VAPID_PRIVATE_KEY;
   if (!publicKey || !privateKey) return null;
   if (!configured) {
-    webpush.setVapidDetails(process.env.VAPID_SUBJECT ?? "mailto:admin@example.com", publicKey, privateKey);
+    webpush.setVapidDetails(process.env.VAPID_SUBJECT || "mailto:admin@example.com", publicKey, privateKey);
     configured = true;
   }
   return { publicKey };

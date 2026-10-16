@@ -11,10 +11,12 @@
     "typecheck": "tsc --noEmit",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate deploy",
+    "db:migrate:live": "node --env-file=.env node_modules/prisma/build/index.js migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed-dev.mts",
-    "db:explain": "tsx --conditions=react-server --env-file-if-exists=.env scripts/explain.mts",
+    "db:explain": "tsx --conditions=react-server scripts/explain.mts",
+    "db:explain:live": "tsx --conditions=react-server --env-file=.env scripts/explain.mts",
     "icons": "tsx scripts/icons.mts"
   },
   "dependencies": {

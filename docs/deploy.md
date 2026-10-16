@@ -33,11 +33,13 @@ Pick **one region** and keep everything near it (for example AWS `us-east-1` / V
 
 ## 3. Create the database schema
 
-From your machine, with the production values in your environment (or a temporary `.env.production.local`):
+Put the live values in `.env` (it's git-ignored; local development uses `.env.local` instead), then from your machine:
 
 ```bash
-pnpm db:migrate
+pnpm db:migrate:live
 ```
+
+It loads only `.env`, so it can't fall back to your local database: with `DATABASE_URL` still blank it stops with "Connection url is empty".
 
 This applies every migration in `prisma/migrations`, including the hand-written full-text search trigger. To run migrations on every deploy instead, set the Vercel build command to:
 
@@ -64,14 +66,14 @@ Push to the production branch (or click **Deploy**). Then:
 - Query plans against real data (read-only):
 
   ```bash
-  pnpm db:explain
+  pnpm db:explain:live
   ```
 
-  It runs the app's own hot queries as the busiest user and prints the indexes each one used; it exits non-zero if any of them scans `messages`, `chat_members` or `users` sequentially. Point it at a Neon branch with `DATABASE_URL=… pnpm db:explain`.
+  It runs the app's own hot queries as the busiest user and prints the indexes each one used; it exits non-zero if any of them scans `messages`, `chat_members` or `users` sequentially. It reads the live `.env`; `pnpm db:explain` (no suffix) checks your local database instead.
 
 ## Operations
 
 - **Logs**: Vercel → Logs. API errors are logged as `[api] unhandled …` with the route.
 - **Rotating secrets**: `CRON_SECRET`, SMTP and R2 keys can be rotated any time (update the variable, redeploy). After rotating `ABLY_API_KEY`, update the presence webhook's signing key too; connected clients fetch new tokens on their own. Don't rotate VAPID keys unless you accept that every device must re-enable push.
 - **Backups**: Neon keeps point-in-time history (the window depends on your plan); restore into a branch first to inspect. R2 objects are only deleted when no message references them.
-- **Scaling**: the app is stateless; Neon's pooled endpoint handles serverless connection bursts. If chat lists get slow for heavy users, `pnpm db:explain --user <id>` shows where.
+- **Scaling**: the app is stateless; Neon's pooled endpoint handles serverless connection bursts. If chat lists get slow for heavy users, `pnpm db:explain:live --user <id>` shows where.

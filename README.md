@@ -44,7 +44,12 @@ Start a local Postgres (Prisma's built-in dev server). It prints a `postgres://�
 pnpm exec prisma dev --name aval --detach
 ```
 
-Create `.env` from `.env.example`. For local work only `APP_URL` and `DATABASE_URL` are required (use the TCP URL from above; `DIRECT_URL` can be omitted). Mail prints to the console, rate limits run in memory, and uploads return 503 until R2 is configured. Then:
+Two env files, both git-ignored:
+
+- **`.env.local`**: local development. Next.js, Prisma, the seed and `db:explain` read it first, so its values win on your machine. Only `APP_URL` and `DATABASE_URL` are required (use the TCP URL from above). Leave `DIRECT_URL` blank so migrations use the local database. Blank (`KEY=""`) counts as unset: mail prints to the console, rate limits run in memory, real-time falls back to polling, and uploads return 503 until R2 (or a local emulator) is configured.
+- **`.env`**: the live site's values, as a reference to copy into Vercel (Vercel doesn't read it). Nothing local uses it unless you run a `:live` script on purpose (`pnpm db:migrate:live`, `pnpm db:explain:live`).
+
+Start both from `.env.example`. Then:
 
 ```bash
 pnpm db:migrate
@@ -64,7 +69,7 @@ pnpm db:seed
 
 To try two users at once, use a normal and a private window (cookies are per profile).
 
-Push locally: add VAPID keys to `.env` (see Cloud services) and use Chrome or Edge on `http://localhost:3000` (a secure context). Settings → Notifications → **Push on this device**. Browsers deliver through their real push service, so your machine needs internet access.
+Push locally: add VAPID keys to `.env.local` (see Cloud services) and use Chrome or Edge on `http://localhost:3000` (a secure context). Settings → Notifications → **Push on this device**. Browsers deliver through their real push service, so your machine needs internet access.
 
 Media locally: run any S3-compatible server and point `R2_ENDPOINT` at it (it's also added to the CSP in development). For example with [s3rver](https://github.com/jamhall/s3rver) and a CORS file allowing `PUT`/`GET` from `http://localhost:3000`:
 
@@ -72,7 +77,7 @@ Media locally: run any S3-compatible server and point `R2_ENDPOINT` at it (it's 
 npx s3rver@3 -d ./.s3 -p 4569 --configure-bucket aval-media ./cors.xml
 ```
 
-Then set `R2_ACCOUNT_ID=local`, `R2_ACCESS_KEY_ID=S3RVER`, `R2_SECRET_ACCESS_KEY=S3RVER`, `R2_BUCKET=aval-media` and `R2_ENDPOINT=http://localhost:4569` in `.env`.
+Then set `R2_ACCOUNT_ID=local`, `R2_ACCESS_KEY_ID=S3RVER`, `R2_SECRET_ACCESS_KEY=S3RVER`, `R2_BUCKET=aval-media` and `R2_ENDPOINT=http://localhost:4569` in `.env.local`.
 
 Checks:
 
@@ -113,9 +118,9 @@ pnpm lint
 Step by step, including the post-deploy checks: **[docs/deploy.md](docs/deploy.md)**. In short:
 
 1. Import the GitHub repo in Vercel, set the function region next to Neon, and add every variable from `.env.example` for Production and Preview.
-2. Apply migrations to Neon:
+2. Fill `.env` with the live values, then apply migrations to Neon:
    ```bash
-   pnpm db:migrate
+   pnpm db:migrate:live
    ```
 3. Deploy, add your domain to the R2 CORS policy, and add the Ably presence webhook.
 

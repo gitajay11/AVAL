@@ -6,10 +6,13 @@
 // Test accounts (local only):
 //   ada_l    / ada@example.test    / test-password-ada
 //   grace.h  / grace@example.test  / test-password-grace
-import "dotenv/config";
+import { config } from "dotenv";
 import { hash } from "@node-rs/argon2";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
+
+// .env.local (local) wins over .env (live site).
+config({ path: [".env.local", ".env"], quiet: true });
 
 const url = process.env.DATABASE_URL ?? "";
 const host = new URL(url).hostname;

@@ -3,15 +3,20 @@
 // EXPLAIN ANALYZEs every captured statement and flags sequential scans on the
 // big tables. Read-only against any database:
 //
-//   pnpm db:explain                       # DATABASE_URL from .env or the environment
+//   pnpm db:explain                       # local database (.env.local)
+//   pnpm db:explain:live                  # live database (.env), read-only
 //   pnpm db:explain --user <uuid>         # pick whose view to test
 //   pnpm db:explain --synthetic           # LOCAL ONLY: add 20k messages + 200 chats first, remove them after
 //
 // Run with --conditions=react-server (see package.json) so the app's
 // server-only modules can be imported.
+import { config } from "dotenv";
 import { PrismaNeon } from "@prisma/adapter-neon";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
+
+// .env.local (local) wins over .env; `pnpm db:explain:live` preloads .env so it targets the live database.
+config({ path: [".env.local", ".env"], quiet: true });
 
 const args = process.argv.slice(2);
 const flag = (name: string) => args.includes(`--${name}`);
