@@ -1,6 +1,6 @@
 import type { Audience } from "@/generated/prisma/client";
 
-/** Avatar URL for <img>: an authorized redirect to a signed R2 URL. Versioned to bust caches. */
+/** Avatar URL for <img>: an authorized redirect to a signed storage URL. Versioned to bust caches. */
 export function avatarUrl(userId: string, avatarKey: string | null): string | null {
   if (!avatarKey) return null;
   const version = avatarKey.slice(avatarKey.lastIndexOf("/") + 1, avatarKey.lastIndexOf("."));

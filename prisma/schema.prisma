@@ -50,7 +50,7 @@ enum AttachmentKind {
   VIDEO
   FILE
   VOICE
-  LINK_PREVIEW // og:image of a link preview, copied into R2
+  LINK_PREVIEW // og:image of a link preview, copied into object storage
 }
 
 enum AttachmentStatus {
@@ -104,7 +104,7 @@ model User {
   displayName     String    @map("display_name") @db.VarChar(64)
   bio             String?   @db.VarChar(160)
   dateOfBirth     DateTime? @map("date_of_birth") @db.Date
-  avatarKey       String?   @map("avatar_key") // R2 object key, served via signed URL only
+  avatarKey       String?   @map("avatar_key") // object-storage key, served via signed URL only
   lastSeenAt      DateTime? @map("last_seen_at")
 
   // privacy
@@ -271,7 +271,7 @@ model Attachment {
   messageId  String?          @map("message_id") @db.Uuid
   kind       AttachmentKind
   status     AttachmentStatus @default(PENDING)
-  // Not unique: a forwarded message references the same R2 object. Objects are
+  // Not unique: a forwarded message references the same stored object. Objects are
   // deleted only when no attachment row points at them any more.
   objectKey  String           @map("object_key")
   mimeType   String           @map("mime_type") @db.VarChar(127)

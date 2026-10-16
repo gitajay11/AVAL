@@ -4,7 +4,7 @@ import { requireSession } from "@/lib/auth/session";
 import { requireOwnedContact } from "@/lib/authz/contacts";
 import { requireGroupAdmin } from "@/lib/groups/service";
 import { db } from "@/lib/db";
-import { presignUpload } from "@/lib/r2";
+import { presignUpload } from "@/lib/object-storage";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { AvatarUploadSchema } from "@/lib/validation/profile";
 

@@ -39,8 +39,8 @@
 - ✅ Privacy (last seen, profile photo, who can message me) and notification toggles persist.
 - ✅ Devices list shows each session, marks "This device", and can sign out others.
 - ☐ Theme: System / Light / Dark switches instantly, survives a reload with no flash, and System follows the OS.
-- ☐ Avatar (needs R2 configured): pick a photo → instant preview → saved as a 512px square WebP; it shows in the chat-list header; **Remove photo** works. Uploading a renamed non-image is rejected.
-- ✅ Without R2 configured, uploads fail cleanly with "Media storage isn't configured."
+- ☐ Avatar (needs object storage configured): pick a photo → instant preview → saved as a 512px square WebP; it shows in the chat-list header; **Remove photo** works. Uploading a renamed non-image is rejected.
+- ✅ Without object storage configured, uploads fail cleanly with "Media storage isn't configured."
 
 ## Security
 - ✅ Mutations from another origin, or with no Origin header, return 403.

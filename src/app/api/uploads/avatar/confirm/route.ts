@@ -5,12 +5,12 @@ import { getContactDetail } from "@/lib/contacts/service";
 import { groupPhotoChanged, requireGroupAdmin } from "@/lib/groups/service";
 import { db } from "@/lib/db";
 import { sniffMime } from "@/lib/media/sniff";
-import { deleteObject, headObject, readHead, UPLOAD_URL_TTL_SECONDS } from "@/lib/r2";
+import { deleteObject, headObject, readHead, UPLOAD_URL_TTL_SECONDS } from "@/lib/object-storage";
 import { meSelect, toMe } from "@/lib/users";
 import { AVATAR_MAX_BYTES, ConfirmUploadSchema } from "@/lib/validation/profile";
 
 /**
- * Step 2 of 2: verify what actually landed in R2 (size and real file signature)
+ * Step 2 of 2: verify what actually landed in storage (size and real file signature)
  * before it becomes the user's avatar. Anything that doesn't match is deleted.
  */
 export const POST = route(async (req) => {

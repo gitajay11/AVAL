@@ -29,7 +29,7 @@ async function toSquareWebp(file: File): Promise<Blob> {
 }
 
 /**
- * Presign → PUT straight to R2 → confirm (server verifies size and file signature).
+ * Presign → PUT straight to object storage → confirm (server verifies size and file signature).
  * With `contactId` / `chatId`, sets a personal contact's or a group's photo instead of mine.
  */
 export async function uploadAvatar(

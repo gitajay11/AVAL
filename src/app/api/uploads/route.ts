@@ -4,7 +4,7 @@ import { createChatUpload } from "@/lib/media/uploads";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { UploadRequestSchema } from "@/lib/validation/chat";
 
-/** Reserve a chat media upload and get a presigned R2 PUT (image, video, voice note or file). */
+/** Reserve a chat media upload and get a presigned storage PUT (image, video, voice note or file). */
 export const POST = route(async (req) => {
   const { user } = await requireSession();
   await rateLimit("mediaUpload", user.id);

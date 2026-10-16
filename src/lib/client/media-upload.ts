@@ -102,7 +102,7 @@ function putWithProgress(url: string, headers: Record<string, string>, body: Blo
   });
 }
 
-/** Presign → PUT straight to R2 (with progress) → confirm. Returns the upload id to send with the message. */
+/** Presign → PUT straight to object storage (with progress) → confirm. Returns the upload id to send with the message. */
 export async function uploadMedia(
   chatId: string,
   media: PreparedMedia,

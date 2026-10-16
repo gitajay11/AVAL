@@ -5,7 +5,7 @@ import { ApiError } from "@/lib/api";
 import { requireMembership } from "@/lib/authz/chats";
 import { cantSendReason } from "@/lib/chats/service";
 import { db } from "@/lib/db";
-import { deleteObject, headObject, presignUpload, readHead, UPLOAD_URL_TTL_SECONDS } from "@/lib/r2";
+import { deleteObject, headObject, presignUpload, readHead, UPLOAD_URL_TTL_SECONDS } from "@/lib/object-storage";
 import type { UploadRequestSchema } from "@/lib/validation/chat";
 import { extensionFor, MEDIA_LIMITS, MEDIA_TYPES, normalizeMime } from "./policy";
 import { bytesMatch } from "./sniff";
@@ -46,7 +46,7 @@ export async function createChatUpload(me: { id: string; emailVerified: boolean 
 }
 
 /**
- * Step 2: check what actually landed in R2 (exact size, and for media the real
+ * Step 2: check what actually landed in storage (exact size, and for media the real
  * file signature) before it can be attached to a message. Mismatches are deleted.
  */
 export async function confirmChatUpload(meId: string, uploadId: string) {

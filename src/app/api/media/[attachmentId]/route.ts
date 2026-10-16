@@ -3,7 +3,7 @@ import { ApiError, route } from "@/lib/api";
 import { requireSession } from "@/lib/auth/session";
 import { accessClearedAt, getChatAccess } from "@/lib/authz/contacts";
 import { db } from "@/lib/db";
-import { presignDownload } from "@/lib/r2";
+import { presignDownload } from "@/lib/object-storage";
 import { uuid } from "@/lib/validation/common";
 
 const SIGNED_URL_TTL = 60 * 60;
@@ -12,7 +12,7 @@ const INLINE_KINDS = new Set(["IMAGE", "VIDEO", "VOICE", "LINK_PREVIEW"]);
 /**
  * Authorized media access: members of the message's chat (or approved viewers
  * of a shared contact), only while the message exists and isn't hidden for the
- * viewer. Redirects to a short-lived signed R2 URL. Files are always served as
+ * viewer. Redirects to a short-lived signed storage URL. Files are always served as
  * downloads; `?download=1` forces a download for media too. Viewers are
  * view-only: no downloads and no files.
  */

@@ -20,12 +20,13 @@ const EnvSchema = z.object({
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: requiredInProd(z.string().min(3)),
 
-  R2_ACCOUNT_ID: requiredInProd(z.string().min(1)),
-  R2_ACCESS_KEY_ID: requiredInProd(z.string().min(1)),
-  R2_SECRET_ACCESS_KEY: requiredInProd(z.string().min(1)),
-  R2_BUCKET: requiredInProd(z.string().min(1)),
-  // Optional S3-compatible endpoint override (local MinIO/s3rver for development).
-  R2_ENDPOINT: z.url().optional(),
+  // Neon Object Storage: AWS-standard names, written by `neon deploy`. Locally
+  // they point at an S3-compatible emulator (s3rver/MinIO).
+  AWS_ENDPOINT_URL_S3: requiredInProd(z.url()),
+  AWS_ACCESS_KEY_ID: requiredInProd(z.string().min(1)),
+  AWS_SECRET_ACCESS_KEY: requiredInProd(z.string().min(1)),
+  AWS_REGION: z.string().min(1).optional(),
+  STORAGE_BUCKET: z.string().min(1).default("aval-media"),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

@@ -132,7 +132,7 @@ export function LinkPreviewCard({ preview, mine }: { preview: LinkPreviewDTO; mi
       )}
     >
       {preview.imageUrl && (
-        // eslint-disable-next-line @next/next/no-img-element -- preview image copied into our R2, signed URL
+        // eslint-disable-next-line @next/next/no-img-element -- preview image copied into our storage, signed URL
         <img src={preview.imageUrl} alt="" loading="lazy" className="aspect-[1.91/1] w-full object-cover" />
       )}
       <span className="block px-3 py-2">

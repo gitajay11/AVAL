@@ -1,9 +1,9 @@
 import "server-only";
 import { db } from "@/lib/db";
-import { deleteObject } from "@/lib/r2";
+import { deleteObject } from "@/lib/object-storage";
 
 /**
- * Delete attachment rows, then remove each R2 object that no other row still
+ * Delete attachment rows, then remove each stored object that no other row still
  * references (forwarded messages share objects with the original).
  */
 export async function deleteAttachments(where: { messageId?: string; ids?: string[] }) {

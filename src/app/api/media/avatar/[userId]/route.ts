@@ -3,14 +3,14 @@ import { ApiError, route } from "@/lib/api";
 import { requireSession } from "@/lib/auth/session";
 import { canSeeAvatar } from "@/lib/authz/privacy";
 import { db } from "@/lib/db";
-import { presignDownload } from "@/lib/r2";
+import { presignDownload } from "@/lib/object-storage";
 import { uuid } from "@/lib/validation/common";
 
 const SIGNED_URL_TTL = 60 * 60;
 
 /**
  * Authorized avatar access: checks the owner's "profile photo" privacy and blocks,
- * then redirects to a short-lived signed R2 URL. Cached privately for less than
+ * then redirects to a short-lived signed storage URL. Cached privately for less than
  * the signature's lifetime.
  */
 export const GET = route<RouteContext<"/api/media/avatar/[userId]">>(async (_req, ctx) => {

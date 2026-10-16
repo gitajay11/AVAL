@@ -6,7 +6,7 @@ import { rebroadcast } from "@/lib/chats/broadcast";
 import { db } from "@/lib/db";
 import { extensionFor } from "@/lib/media/policy";
 import { sniffMime } from "@/lib/media/sniff";
-import { putObject } from "@/lib/r2";
+import { putObject } from "@/lib/object-storage";
 import { isPrivateAddress } from "@/lib/security/ip";
 import { firstUrl, parseMeta } from "./link-meta";
 
@@ -86,7 +86,7 @@ async function safeFetch(raw: string, accept: string, maxBytes: number) {
 
 /**
  * Fetch a preview for a message's first link and attach it. The page's image is
- * copied into R2, so the browser only ever loads media from our own storage.
+ * copied into object storage, so the browser only ever loads media from our own storage.
  * Runs after the response; failures just mean no preview.
  */
 export async function attachLinkPreview(actorId: string, messageId: string) {

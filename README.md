@@ -1,6 +1,6 @@
 # Aval
 
-A Telegram-style chat PWA. Next.js 16 (App Router) + Tailwind v4 + Motion on Vercel, Neon Postgres via Prisma 7, Ably for real-time, Cloudflare R2 for media, Upstash for rate limiting.
+A Telegram-style chat PWA. Next.js 16 (App Router) + Tailwind v4 + Motion on Vercel, Neon Postgres via Prisma 7, Ably for real-time, Neon Object Storage for media, Upstash for rate limiting.
 
 **Status: Phase 6 — polish and PWA install (all six phases done).** Deploy guide: [docs/deploy.md](docs/deploy.md). Checklists: [phase 1](docs/phase-1-checklist.md), [phase 2](docs/phase-2-checklist.md), [phase 3](docs/phase-3-checklist.md), [phase 4](docs/phase-4-checklist.md), [phase 5](docs/phase-5-checklist.md), [phase 6](docs/phase-6-checklist.md).
 
@@ -14,8 +14,8 @@ A Telegram-style chat PWA. Next.js 16 (App Router) + Tailwind v4 + Motion on Ver
 | Validation | zod everywhere; shared schemas in [src/lib/validation](src/lib/validation). Text is NFC-normalized and stripped of control and bidi-override characters. |
 | Rate limits | [src/lib/security/rate-limit.ts](src/lib/security/rate-limit.ts): login per IP and per identifier, signup, username check, reset, uploads. |
 | Email links | Tokens travel in the URL **fragment** (`#token=`), so they never reach server logs or `Referer`. Single-use, hashed at rest, superseded by newer links. |
-| Media | Images are downscaled and re-encoded in the browser (strips EXIF/GPS). Upload = presigned PUT that signs exact `Content-Type` + `Content-Length` → confirm checks size and real file signature (images, video, audio) → attach to a message. Reads go through `/api/media/:id`, which checks chat membership, deletion and "delete for me", then redirects to a 1-hour signed URL. Plain files are always served as downloads. Forwarded media share the R2 object; objects are deleted when no attachment references them. |
-| Link previews | Fetched server-side after sending, with an SSRF guard at connect time (every resolved IP checked, private/link-local/metadata ranges refused, ports 80/443 only, redirects re-validated, 512 KB cap, 5 s timeout). The page's image is copied into R2, so browsers never load third-party URLs. |
+| Media | Images are downscaled and re-encoded in the browser (strips EXIF/GPS). Upload = presigned PUT that signs exact `Content-Type` + `Content-Length` → confirm checks size and real file signature (images, video, audio) → attach to a message. Reads go through `/api/media/:id`, which checks chat membership, deletion and "delete for me", then redirects to a 1-hour signed URL. Plain files are always served as downloads. Forwarded media share the stored object; objects are deleted when no attachment references them. |
+| Link previews | Fetched server-side after sending, with an SSRF guard at connect time (every resolved IP checked, private/link-local/metadata ranges refused, ports 80/443 only, redirects re-validated, 512 KB cap, 5 s timeout). The page's image is copied into object storage, so browsers never load third-party URLs. |
 | Personal contacts | A contact is a one-way chat (type `CONTACT`, the owner is its only member). Who may see it is decided in one pure function, [`contactRole`](src/lib/contacts/policy.ts): owner, viewer (approved and still public), discoverable (public: name and photo only) or hidden (private, or blocked either way). Every route goes through [src/lib/authz/contacts.ts](src/lib/authz/contacts.ts). Viewers get read access via `getChatAccess`; every write still requires chat membership, so they're read-only by construction (no sending, reacting, forwarding, starring or downloads). Going Private, revoking, blocking or deleting ends access on the next request, and real-time recipients are recomputed per event. |
 | Groups | Up to 200 members with roles owner / admin / member ([src/lib/groups/service.ts](src/lib/groups/service.ts)). Adding someone follows their *Who can message me* setting and blocks, exactly like starting a 1:1 chat. Admins edit name, description and photo and add or remove members; only the owner promotes or demotes admins or removes an admin. If the owner leaves, ownership passes to the longest-standing admin (else member); the last one out deletes the group and its media. Every change is posted as a system line. Members' photos follow each person's photo privacy. |
 | Search | Postgres full-text search on `messages.search_vector` (GIN index, `simple` config, trigger-maintained). The query is rebuilt from letters and digits only ([src/lib/search/tsquery.ts](src/lib/search/tsquery.ts)), so user input can never inject tsquery operators. In-chat search uses the same access check as reading the chat; global search joins on my memberships and applies "clear history" and "delete for me" in the same query. Keyset-paginated, rate-limited. Picking a result loads a window around that message (`?around=`) and lets you scroll both ways. |
@@ -46,7 +46,7 @@ pnpm exec prisma dev --name aval --detach
 
 Two env files, both git-ignored:
 
-- **`.env.local`**: local development. Next.js, Prisma, the seed and `db:explain` read it first, so its values win on your machine. Only `APP_URL` and `DATABASE_URL` are required (use the TCP URL from above). Leave `DIRECT_URL` blank so migrations use the local database. Blank (`KEY=""`) counts as unset: mail prints to the console, rate limits run in memory, real-time falls back to polling, and uploads return 503 until R2 (or a local emulator) is configured.
+- **`.env.local`**: local development. Next.js, Prisma, the seed and `db:explain` read it first, so its values win on your machine. Only `APP_URL` and `DATABASE_URL` are required (use the TCP URL from above). Leave `DIRECT_URL` blank so migrations use the local database. Blank (`KEY=""`) counts as unset: mail prints to the console, rate limits run in memory, real-time falls back to polling, and uploads return 503 until object storage (or a local emulator) is configured.
 - **`.env`**: the live site's values, as a reference to copy into Vercel (Vercel doesn't read it). Nothing local uses it unless you run a `:live` script on purpose (`pnpm db:migrate:live`, `pnpm db:explain:live`).
 
 Start both from `.env.example`. Then:
@@ -71,13 +71,13 @@ To try two users at once, use a normal and a private window (cookies are per pro
 
 Push locally: add VAPID keys to `.env.local` (see Cloud services) and use Chrome or Edge on `http://localhost:3000` (a secure context). Settings → Notifications → **Push on this device**. Browsers deliver through their real push service, so your machine needs internet access.
 
-Media locally: run any S3-compatible server and point `R2_ENDPOINT` at it (it's also added to the CSP in development). For example with [s3rver](https://github.com/jamhall/s3rver) and a CORS file allowing `PUT`/`GET` from `http://localhost:3000`:
+Media locally: run any S3-compatible server and point `AWS_ENDPOINT_URL_S3` at it (it's also added to the CSP). For example with [s3rver](https://github.com/jamhall/s3rver) and a CORS file allowing `PUT`/`GET` from `http://localhost:3000`:
 
 ```bash
 npx s3rver@3 -d ./.s3 -p 4569 --configure-bucket aval-media ./cors.xml
 ```
 
-Then set `R2_ACCOUNT_ID=local`, `R2_ACCESS_KEY_ID=S3RVER`, `R2_SECRET_ACCESS_KEY=S3RVER`, `R2_BUCKET=aval-media` and `R2_ENDPOINT=http://localhost:4569` in `.env.local`.
+Then set `AWS_ENDPOINT_URL_S3=http://localhost:4569`, `AWS_ACCESS_KEY_ID=S3RVER`, `AWS_SECRET_ACCESS_KEY=S3RVER`, `AWS_REGION=us-east-1` and `STORAGE_BUCKET=aval-media` in `.env.local`. Define all four `AWS_*` there so the live Neon storage credentials in `.env` never apply locally.
 
 Checks:
 
@@ -101,9 +101,9 @@ pnpm lint
 
 ## Cloud services
 
-1. **Neon** — create a project and a database `aval`. Copy the *pooled* connection string to `DATABASE_URL` and the *direct* one to `DIRECT_URL`. Optional: create a `dev` branch for local work. On the free plan computes suspend when idle (~0.5 s cold start); disable autosuspend on the production branch if that matters.
+1. **Neon** — already linked (project `ancient-darkness-60354121`, branch `production`, see [neon.ts](neon.ts)). `neon deploy` writes `DATABASE_URL` (pooled) and `DATABASE_URL_UNPOOLED` (direct, for migrations) into `.env`; then `pnpm db:migrate:live`. Optional: `neon checkout dev --create` for a development branch. On the free plan computes suspend when idle (~0.5 s cold start); disable autosuspend on the production branch if that matters.
 2. **Upstash** — create a Redis database (region near your Vercel region) and copy the REST URL and token.
-3. **Cloudflare R2** — create bucket `aval-media` (keep it private; no public access, no custom domain). Create an API token with *Object Read & Write* on that bucket and copy Account ID, Access Key ID and Secret. Under the bucket's **Settings → CORS policy**, paste [r2-cors.json](r2-cors.json) with your real domain.
+3. **Neon Object Storage** — the private bucket `aval-media` is declared in [neon.ts](neon.ts); `neon deploy` creates it and writes `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL_S3` and `AWS_REGION` into `.env`. Once `APP_URL` is set, allow browser uploads from your domain with `pnpm storage:cors:live`.
 4. **Ably** — create an app and copy its root API key to `ABLY_API_KEY` (keep it server-side). For instant online/offline updates, add a webhook under **Integrations → Webhooks**: URL `https://YOUR-DOMAIN/api/realtime/webhook`, source **Presence**, channel filter `^user:`, **enveloped** and **signed with the same key**. Without the webhook, status still refreshes every 30 s.
 5. **SMTP** — any provider (Resend, Postmark, SES, Brevo…). Use a verified sending domain in `SMTP_FROM`.
 6. **CRON_SECRET** — any long random string.
@@ -122,7 +122,7 @@ Step by step, including the post-deploy checks: **[docs/deploy.md](docs/deploy.m
    ```bash
    pnpm db:migrate:live
    ```
-3. Deploy, add your domain to the R2 CORS policy, and add the Ably presence webhook.
+3. Deploy, run `pnpm storage:cors:live` with your domain in `APP_URL`, and add the Ably presence webhook.
 
 The service worker and manifest need no extra setup; each deploy rolls out a new worker automatically.
 
@@ -138,7 +138,7 @@ src/proxy.ts                optimistic auth redirects, sliding cookie refresh
 src/app/(auth)/             login, signup, welcome, verify, forgot/reset
 src/app/(app)/              signed-in shell: chats, settings
 src/app/api/                route handlers (auth, me, uploads, media, cron)
-src/lib/                    server libs: db, env, api helpers, auth, security, r2, mail
+src/lib/                    server libs: db, env, api helpers, auth, security, object storage, mail
 src/lib/chats/              chat queries, services, receipts, cursor, timeline, shared types
 src/lib/contacts/           contact access policy, service (requests, grants, notifications), types
 src/lib/groups/             group service (create, members, roles, leave), avatar URLs

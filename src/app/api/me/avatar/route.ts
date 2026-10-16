@@ -1,7 +1,7 @@
 import { json, route } from "@/lib/api";
 import { requireSession } from "@/lib/auth/session";
 import { db } from "@/lib/db";
-import { deleteObject } from "@/lib/r2";
+import { deleteObject } from "@/lib/object-storage";
 import { meSelect, toMe } from "@/lib/users";
 
 /** Remove the profile photo. */

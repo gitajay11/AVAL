@@ -16,7 +16,7 @@ export type AttachmentDTO = {
   height: number | null;
   durationMs: number | null;
   waveform: number[] | null;
-  /** Authorized redirect to a short-lived signed R2 URL. */
+  /** Authorized redirect to a short-lived signed storage URL. */
   url: string;
 };
 

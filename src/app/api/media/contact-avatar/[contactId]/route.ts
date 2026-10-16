@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { ApiError, route } from "@/lib/api";
 import { requireSession } from "@/lib/auth/session";
 import { contactWithRole } from "@/lib/authz/contacts";
-import { presignDownload } from "@/lib/r2";
+import { presignDownload } from "@/lib/object-storage";
 
 /**
  * A contact's photo: for its owner, its viewers, and (while public) anyone,

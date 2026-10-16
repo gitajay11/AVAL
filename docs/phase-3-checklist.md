@@ -1,6 +1,6 @@
 # Phase 3 test checklist — media, message actions and receipts
 
-✅ = verified during the build: unit tests (83), an API suite (50 checks) and a media suite (21 checks) against local Postgres and a local S3 emulator, plus the in-app browser in polling mode. ☐ = please check by hand. **(Ably)** needs `ABLY_API_KEY`. **(R2)** needs real R2 (or the local S3 setup in the README).
+✅ = verified during the build: unit tests (83), an API suite (50 checks) and a media suite (21 checks) against local Postgres and a local S3 emulator, plus the in-app browser in polling mode. ☐ = please check by hand. **(Ably)** needs `ABLY_API_KEY`. **(Storage)** needs Neon Object Storage (or the local S3 setup in the README).
 
 ## Media
 - ✅ Photo with a caption: the preview shows in the composer, then an upload ring on the bubble, then the photo at its real aspect ratio. Tap opens a full-screen viewer with download.
@@ -11,15 +11,15 @@
 - ✅ Uploads are tied to their chat. They can't be sent twice, sent before confirmation, or sent into another chat.
 - ✅ Media URLs work only for chat members (others get 404), stop working after "delete for everyone", and are 1-hour signed redirects.
 - ✅ A forwarded photo keeps working after the original is deleted (the object is shared and reference-counted).
-- ☐ **(R2)** Record a voice note: tap the mic, allow the microphone, watch the live meter, send. Trash discards it.
-- ☐ **(R2)** Video plays inline (`playsInline` on iOS) and seeks.
+- ☐ **(Storage)** Record a voice note: tap the mic, allow the microphone, watch the live meter, send. Trash discards it.
+- ☐ **(Storage)** Video plays inline (`playsInline` on iOS) and seeks.
 - ☐ Paste an image from the clipboard, or drag a file onto the composer.
 - ☐ On iPhone, pick a HEIC photo: it's converted to JPEG (Safari) or sent as a file (other browsers).
 
 ## Link previews
 - ✅ A message with a link gets a preview card (site, title, description) a few seconds after sending. It's removed if an edit changes the link.
 - ✅ No previews for `localhost`, `127.0.0.1`, `169.254.169.254`, `[::1]`, non-standard ports, or hostnames that resolve to private IPs (`localtest.me`).
-- ☐ **(R2)** For a page with `og:image`, the image appears in the card, served from our storage.
+- ☐ **(Storage)** For a page with `og:image`, the image appears in the card, served from our storage.
 
 ## Message actions (right-click on desktop, long-press on touch)
 - ✅ The menu shows 7 quick reactions, then Reply · Copy text · Forward · Pin · Star · Edit · Delete · Report (not on your own messages). It stays on screen near edges and has frosted glass.

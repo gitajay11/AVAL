@@ -4,7 +4,7 @@ import { requireOwnedContact, requireVisibleContact, type ContactRow } from "@/l
 import { blockedAmong } from "@/lib/authz/privacy";
 import { db } from "@/lib/db";
 import { deleteAttachments } from "@/lib/media/storage";
-import { deleteObject } from "@/lib/r2";
+import { deleteObject } from "@/lib/object-storage";
 import { pushAccessEvent } from "@/lib/push/notify";
 import { publishToUsers } from "@/lib/realtime/server";
 import { avatarUrl } from "@/lib/users";

@@ -10,19 +10,23 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { ApiError } from "@/lib/api";
 import { env } from "@/lib/env";
 
+// Neon Object Storage (S3-compatible, branches with the database). `neon deploy`
+// injects the AWS-standard variables for the linked branch; locally they point
+// at an S3 emulator. Neon requires path-style addressing and SigV4.
+
 let client: S3Client | undefined;
 
 function s3(): S3Client {
   if (client) return client;
   const e = env();
-  if (!e.R2_ACCOUNT_ID || !e.R2_ACCESS_KEY_ID || !e.R2_SECRET_ACCESS_KEY) {
+  if (!e.AWS_ENDPOINT_URL_S3 || !e.AWS_ACCESS_KEY_ID || !e.AWS_SECRET_ACCESS_KEY) {
     throw new ApiError(503, "storage_unavailable", "Media storage isn't configured.");
   }
   client = new S3Client({
-    region: "auto",
-    endpoint: e.R2_ENDPOINT ?? `https://${e.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-    forcePathStyle: Boolean(e.R2_ENDPOINT),
-    credentials: { accessKeyId: e.R2_ACCESS_KEY_ID, secretAccessKey: e.R2_SECRET_ACCESS_KEY },
+    region: e.AWS_REGION ?? "us-east-1",
+    endpoint: e.AWS_ENDPOINT_URL_S3,
+    forcePathStyle: true,
+    credentials: { accessKeyId: e.AWS_ACCESS_KEY_ID, secretAccessKey: e.AWS_SECRET_ACCESS_KEY },
     // Don't add CRC32 checksum headers the browser upload wouldn't send.
     requestChecksumCalculation: "WHEN_REQUIRED",
     responseChecksumValidation: "WHEN_REQUIRED",
@@ -30,7 +34,7 @@ function s3(): S3Client {
   return client;
 }
 
-const bucket = () => env().R2_BUCKET!;
+const bucket = () => env().STORAGE_BUCKET;
 
 export const UPLOAD_URL_TTL_SECONDS = 5 * 60;
 
@@ -49,7 +53,7 @@ export async function presignUpload(key: string, contentType: string, contentLen
 
 /**
  * Short-lived signed GET. Media is never public. `contentType`/`downloadName`
- * override what R2 sends, so arbitrary uploaded files are served as downloads.
+ * override what storage sends, so arbitrary uploaded files are served as downloads.
  */
 export function presignDownload(
   key: string,
@@ -92,6 +96,6 @@ export async function readHead(key: string, n = 32): Promise<Uint8Array> {
 
 export async function deleteObject(key: string) {
   await s3().send(new DeleteObjectCommand({ Bucket: bucket(), Key: key })).catch((err) => {
-    console.error("[r2] delete failed", key, err);
+    console.error("[storage] delete failed", key, err);
   });
 }

@@ -7,7 +7,7 @@ import { getMessage } from "@/lib/chats/queries";
 import type { MemberDTO } from "@/lib/chats/types";
 import { db } from "@/lib/db";
 import { deleteAttachments } from "@/lib/media/storage";
-import { deleteObject } from "@/lib/r2";
+import { deleteObject } from "@/lib/object-storage";
 import { publishToUsers } from "@/lib/realtime/server";
 import { avatarUrl } from "@/lib/users";
 import { MAX_GROUP_MEMBERS } from "@/lib/validation/groups";

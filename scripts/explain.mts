@@ -11,7 +11,6 @@
 // Run with --conditions=react-server (see package.json) so the app's
 // server-only modules can be imported.
 import { config } from "dotenv";
-import { PrismaNeon } from "@prisma/adapter-neon";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 
@@ -36,9 +35,8 @@ const captured: Captured[] = [];
 let label = "";
 
 const prisma = new PrismaClient({
-  adapter: url.hostname.endsWith(".neon.tech")
-    ? new PrismaNeon({ connectionString })
-    : new PrismaPg({ connectionString, max: Number(url.searchParams.get("connection_limit")) || 1 }),
+  // Same driver as the app (src/lib/db.ts): node-postgres for Neon and local alike.
+  adapter: new PrismaPg({ connectionString, max: Number(url.searchParams.get("connection_limit")) || 1 }),
   log: [{ emit: "event", level: "query" }],
 });
 prisma.$on("query", (e) => {

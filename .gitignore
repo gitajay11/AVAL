@@ -46,3 +46,4 @@ next-env.d.ts
 
 # local S3 emulator data
 /.s3/
+.neon

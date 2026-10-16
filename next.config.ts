@@ -11,21 +11,20 @@ const buildId = isDev
 
 // Static CSP (no nonces) so pages keep their prerendered static shells. Inline
 // scripts are Next's own bootstrap; user content is never rendered as HTML.
-// connect/img/media allow R2 (presigned uploads, signed reads) and Ably (real-time).
-// Plus the optional S3-compatible endpoint used for local development.
-const R2 = ["https://*.r2.cloudflarestorage.com", process.env.R2_ENDPOINT ? new URL(process.env.R2_ENDPOINT).origin : ""]
-  .filter(Boolean)
-  .join(" ");
+// connect/img/media allow the object-storage endpoint (presigned uploads, signed
+// reads) and Ably (real-time). The endpoint is the Neon branch's storage host
+// (AWS_ENDPOINT_URL_S3, from `neon deploy`), or the local S3 emulator in development.
+const STORAGE = process.env.AWS_ENDPOINT_URL_S3 ? new URL(process.env.AWS_ENDPOINT_URL_S3).origin : "";
 // Ably real-time endpoints and fallback hosts.
 const ABLY = "https://*.ably.io wss://*.ably.io https://*.ably.net wss://*.ably.net https://*.ably-realtime.com wss://*.ably-realtime.com";
 const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' blob: data: ${R2}`,
-  `media-src 'self' blob: ${R2}`,
+  `img-src 'self' blob: data: ${STORAGE}`,
+  `media-src 'self' blob: ${STORAGE}`,
   "font-src 'self'",
-  `connect-src 'self' ${R2} ${ABLY}${isDev ? " ws:" : ""}`,
+  `connect-src 'self' ${STORAGE} ${ABLY}${isDev ? " ws:" : ""}`,
   "worker-src 'self'",
   "manifest-src 'self'",
   "frame-ancestors 'none'",

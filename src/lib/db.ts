@@ -1,20 +1,26 @@
 import "server-only";
-import { PrismaNeon } from "@prisma/adapter-neon";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { attachDatabasePool } from "@vercel/functions";
+import { Pool } from "pg";
 import { PrismaClient } from "@/generated/prisma/client";
 import { env } from "@/lib/env";
 
 function createClient() {
   const connectionString = env().DATABASE_URL;
-  // Neon in every deployed environment; plain TCP for a local Postgres
-  // (`prisma dev`), which the Neon driver can't reach.
-  const url = new URL(connectionString);
+  // node-postgres everywhere: Neon's pooled endpoint (`-pooler`, PgBouncer) when
+  // deployed, plain TCP for a local `prisma dev`. On Vercel Fluid compute the
+  // pool is reused across requests, which is Neon's recommended setup there.
   // `connection_limit` caps the local pool (the `prisma dev` server handles one connection well).
+  const url = new URL(connectionString);
   const max = Number(url.searchParams.get("connection_limit")) || undefined;
-  const adapter = url.hostname.endsWith(".neon.tech")
-    ? new PrismaNeon({ connectionString })
-    : new PrismaPg({ connectionString, max });
-  return new PrismaClient({ adapter });
+  // Neon's strings say sslmode=require, which pg 8 treats as full certificate
+  // verification but pg 9 will weaken to libpq's "require". Pin the strong mode
+  // here (not in .env, which `neon deploy` rewrites).
+  if (["require", "prefer", "verify-ca"].includes(url.searchParams.get("sslmode") ?? "")) url.searchParams.set("sslmode", "verify-full");
+  const pool = new Pool({ connectionString: url.toString(), max });
+  // Keeps a Vercel function instance alive until idle connections are released (no-op elsewhere).
+  attachDatabasePool(pool);
+  return new PrismaClient({ adapter: new PrismaPg(pool) });
 }
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
