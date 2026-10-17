@@ -3,7 +3,7 @@ import { ApiError, route } from "@/lib/api";
 import { requireSession } from "@/lib/auth/session";
 import { canSeeAvatar } from "@/lib/authz/privacy";
 import { db } from "@/lib/db";
-import { presignDownload } from "@/lib/object-storage";
+import { presignAvatar } from "@/lib/object-storage";
 import { uuid } from "@/lib/validation/common";
 
 const SIGNED_URL_TTL = 60 * 60;
@@ -13,7 +13,7 @@ const SIGNED_URL_TTL = 60 * 60;
  * then redirects to a short-lived signed storage URL. Cached privately for less than
  * the signature's lifetime.
  */
-export const GET = route<RouteContext<"/api/media/avatar/[userId]">>(async (_req, ctx) => {
+export const GET = route<RouteContext<"/api/media/avatar/[userId]">>(async (req, ctx) => {
   const { user: viewer } = await requireSession();
   const id = uuid.safeParse((await ctx.params).userId);
   if (!id.success) throw new ApiError(404, "not_found", "Not found.");
@@ -26,7 +26,7 @@ export const GET = route<RouteContext<"/api/media/avatar/[userId]">>(async (_req
     throw new ApiError(404, "not_found", "Not found.");
   }
 
-  const url = await presignDownload(owner.avatarKey, { expiresIn: SIGNED_URL_TTL });
+  const url = await presignAvatar(owner.avatarKey, new URL(req.url).searchParams.get("size"), SIGNED_URL_TTL);
   return NextResponse.redirect(url, {
     status: 302,
     headers: { "Cache-Control": "private, max-age=600" },

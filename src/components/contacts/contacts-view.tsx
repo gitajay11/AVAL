@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { IdleLink as Link } from "@/components/ui/idle-link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { BookUser, ChevronLeft, Eye, Globe, Lock, Plus, Search, Users } from "lucide-react";
@@ -15,6 +15,8 @@ import { cn } from "@/lib/cn";
 import { api, ClientApiError } from "@/lib/client/api";
 import type { MyContactDTO, SharedContactDTO } from "@/lib/contacts/types";
 import { PublicContactResults } from "./public-contact-results";
+import { FloatingBar } from "@/components/ui/floating-bar";
+import { UsernameField, useUsernameField } from "@/components/ui/username-field";
 
 type Tab = "mine" | "shared";
 
@@ -26,12 +28,17 @@ const VISIBILITY = [
 function CreateContactSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
   const toast = useToast();
-  const [form, setForm] = useState({ name: "", note: "", visibility: "PRIVATE" as "PRIVATE" | "PUBLIC" });
+  const [form, setForm] = useState({ name: "", username: "", note: "", visibility: "PRIVATE" as "PRIVATE" | "PUBLIC" });
   const [fields, setFields] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const handle = useUsernameField(form.username);
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
+    if (handle.blocked && (handle.state.status === "taken" || handle.state.status === "invalid")) {
+      setFields({ username: handle.state.reason });
+      return;
+    }
     setSaving(true);
     setFields({});
     try {
@@ -54,6 +61,12 @@ function CreateContactSheet({ open, onClose }: { open: boolean; onClose: () => v
     <Sheet open={open} onClose={onClose} title="New personal contact" description="Not a real account: a person you write to, like a journal.">
       <form method="post" onSubmit={create} className="flex flex-col gap-4 pt-2" noValidate>
         <Input label="Name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} error={fields.name} maxLength={64} autoFocus />
+        <UsernameField
+          value={form.username}
+          onChange={(username) => setForm((f) => ({ ...f, username }))}
+          error={fields.username}
+          hint="Shared with people's usernames, so it's unique. Public contacts can be found by it."
+        />
         <Textarea label="Note" optional value={form.note} onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))} error={fields.note} maxLength={500} rows={2} />
         <Segmented
           label="Visibility"
@@ -110,12 +123,12 @@ export function ContactsView({ mine, shared: initialShared }: { mine: MyContactD
 
   return (
     <div className="h-full overflow-y-auto">
-      <header className="glass sticky top-0 z-10 border-b border-line px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3">
+      <FloatingBar className="px-2 py-2">
         <div className="flex items-center gap-2">
           <Link href="/chats" className="grid size-10 place-items-center rounded-xl hover:bg-surface-3 md:hidden" aria-label="Back to chats">
             <ChevronLeft className="size-6" />
           </Link>
-          <h1 className="flex-1 px-1 text-xl font-extrabold tracking-tight">Contacts</h1>
+          <h1 className="floating-title flex-1 px-1 text-xl font-extrabold tracking-tight">Contacts</h1>
           <Button size="sm" onClick={() => setCreating(true)}>
             <Plus className="size-4" aria-hidden="true" /> New
           </Button>
@@ -134,7 +147,7 @@ export function ContactsView({ mine, shared: initialShared }: { mine: MyContactD
             </button>
           ))}
         </div>
-      </header>
+      </FloatingBar>
 
       <div className="mx-auto max-w-2xl px-4 py-4 pb-[max(2rem,env(safe-area-inset-bottom))]">
         {tab === "mine" ? (
@@ -150,10 +163,10 @@ export function ContactsView({ mine, shared: initialShared }: { mine: MyContactD
               <Button onClick={() => setCreating(true)}>Create a contact</Button>
             </div>
           ) : (
-            <ul className="flex flex-col gap-1">
+            <ul className="flex flex-col gap-1.5">
               {mine.map((c) => (
                 <li key={c.id}>
-                  <Link href={`/contacts/${c.id}`} className="flex items-center gap-3 rounded-2xl px-2 py-2.5 hover:bg-surface-2">
+                  <Link href={`/contacts/${c.id}`} className="glass-1 glass-sheen flex items-center gap-3 rounded-2xl px-2.5 py-2.5 transition-transform active:scale-[0.97]">
                     <Avatar name={c.name} src={c.avatarUrl} size={48} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[15px] font-semibold">{c.name}</span>
@@ -179,10 +192,10 @@ export function ContactsView({ mine, shared: initialShared }: { mine: MyContactD
         ) : shared.length === 0 ? (
           <p className="px-2 py-10 text-center text-[15px] text-muted">Nothing shared with you yet. Find a public contact below and ask its owner for access.</p>
         ) : (
-          <ul className="flex flex-col gap-1">
+          <ul className="flex flex-col gap-1.5">
             {shared.map((c) => (
               <li key={c.id}>
-                <Link href={`/chats/${c.chatId}`} className="flex items-center gap-3 rounded-2xl px-2 py-2.5 hover:bg-surface-2">
+                <Link href={`/chats/${c.chatId}`} className="glass-1 glass-sheen flex items-center gap-3 rounded-2xl px-2.5 py-2.5 transition-transform active:scale-[0.97]">
                   <Avatar name={c.name} src={c.avatarUrl} size={48} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[15px] font-semibold">{c.name}</span>

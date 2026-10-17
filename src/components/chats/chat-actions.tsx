@@ -16,6 +16,8 @@ export type ChatActions = {
   reply: (m: MessageDTO) => void;
   openMenu: (m: MessageDTO, point: { x: number; y: number }) => void;
   toggleReaction: (m: MessageDTO, emoji: string) => void;
+  /** Who reacted to this message. */
+  showReactions: (m: MessageDTO) => void;
   jumpTo: (messageId: string) => void;
 };
 

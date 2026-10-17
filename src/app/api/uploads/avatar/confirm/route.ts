@@ -5,7 +5,7 @@ import { getContactDetail } from "@/lib/contacts/service";
 import { groupPhotoChanged, requireGroupAdmin } from "@/lib/groups/service";
 import { db } from "@/lib/db";
 import { sniffMime } from "@/lib/media/sniff";
-import { deleteObject, headObject, readHead, UPLOAD_URL_TTL_SECONDS } from "@/lib/object-storage";
+import { deleteObject, fullAvatarKey, headObject, readHead, UPLOAD_URL_TTL_SECONDS } from "@/lib/object-storage";
 import { meSelect, toMe } from "@/lib/users";
 import { AVATAR_MAX_BYTES, ConfirmUploadSchema } from "@/lib/validation/profile";
 
@@ -35,6 +35,12 @@ export const POST = route(async (req) => {
   if (!head) throw new ApiError(409, "upload_missing", "Upload didn't finish. Please try again.");
   if (head.size !== upload.sizeBytes || head.size > AVATAR_MAX_BYTES) await reject("File size didn't match.");
   if (sniffMime(await readHead(upload.objectKey)) !== upload.mimeType) await reject("That file isn't a valid image.");
+  // The optional full-size copy gets the same checks; a bad one is dropped (the 512px picture still works).
+  const fullKey = fullAvatarKey(upload.objectKey);
+  const full = await headObject(fullKey);
+  if (full && (full.size > AVATAR_MAX_BYTES || sniffMime(await readHead(fullKey)) !== upload.mimeType)) {
+    await deleteObject(fullKey);
+  }
 
   // A contact's photo: the contact id is in the key; ownership is re-checked now.
   if (upload.objectKey.startsWith("contacts/")) {

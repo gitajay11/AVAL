@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { Camera, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
@@ -7,9 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
 import { api, ClientApiError } from "@/lib/client/api";
+import { cropToCanvas, type CropArea } from "@/lib/client/crop";
 import { uploadAvatar } from "@/lib/client/upload-avatar";
 import type { MyContactDTO } from "@/lib/contacts/types";
 import type { Me } from "@/lib/users";
+
+// Only loaded once a photo is picked.
+const ImageCropper = dynamic(() => import("@/components/ui/image-cropper").then((m) => m.ImageCropper), { ssr: false });
 
 type Props = {
   name: string;
@@ -22,8 +27,8 @@ type Props = {
 );
 
 /**
- * Tap the photo to choose a new one; a preview shows immediately while it
- * uploads. Sets my own photo, a personal contact's (`contactId`) or a group's (`chatId`).
+ * Tap the photo to choose a new one, crop it (1:1, squircle mask, zoom, rotate),
+ * and the cropped picture shows immediately while it uploads. Sets my own photo, a personal contact's (`contactId`) or a group's (`chatId`).
  */
 export function AvatarPicker({ name, avatarUrl, size = 112, ...target }: Props) {
   const apply = (r: { user?: Me; contact?: MyContactDTO }) => {
@@ -35,24 +40,39 @@ export function AvatarPicker({ name, avatarUrl, size = 112, ...target }: Props) 
   const input = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [picked, setPicked] = useState<{ file: File; url: string } | null>(null);
   const toast = useToast();
 
-  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    const local = URL.createObjectURL(file);
-    setPreview(local);
+    if (!file.type.startsWith("image/")) return toast("Choose an image file.", "error");
+    setPicked({ file, url: URL.createObjectURL(file) });
+  }
+
+  function closeCropper() {
+    if (picked) URL.revokeObjectURL(picked.url);
+    setPicked(null);
+  }
+
+  async function onCropped(area: CropArea, rotation: number) {
+    if (!picked) return;
+    const { file } = picked;
+    closeCropper();
     setBusy(true);
+    let local: string | null = null;
     try {
-      apply(await uploadAvatar(file, { contactId: target.contactId, chatId: target.chatId }));
+      const square = await cropToCanvas(file, area, rotation, 1080);
+      local = square.toDataURL("image/jpeg", 0.8);
+      setPreview(local);
+      apply(await uploadAvatar(square, { contactId: target.contactId, chatId: target.chatId }));
       toast("Photo updated");
     } catch (err) {
       toast(err instanceof ClientApiError ? err.message : "Upload failed.", "error");
     } finally {
       setBusy(false);
       setPreview(null);
-      URL.revokeObjectURL(local);
     }
   }
 
@@ -100,6 +120,9 @@ export function AvatarPicker({ name, avatarUrl, size = 112, ...target }: Props) 
         </span>
       </button>
       <input ref={input} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" hidden onChange={onFile} />
+      {picked && (
+        <ImageCropper src={picked.url} title="Crop photo" shape="squircle" saveLabel="Set photo" onCancel={closeCropper} onSave={onCropped} />
+      )}
       {avatarUrl && !busy && (
         <Button variant="ghost" size="sm" onClick={onRemove}>
           <Trash2 className="size-4" aria-hidden="true" /> Remove photo

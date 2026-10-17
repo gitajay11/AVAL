@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/toast";
 import { api, ClientApiError } from "@/lib/client/api";
 import type { Me } from "@/lib/users";
 import { Section } from "./section";
+import { DateOfBirthField } from "@/components/ui/date-of-birth-field";
 
 export function ProfileSection({ me, onChange }: { me: Me; onChange: (me: Me) => void }) {
   const router = useRouter();
@@ -66,14 +67,12 @@ export function ProfileSection({ me, onChange }: { me: Me; onChange: (me: Me) =>
           rows={2}
           hint={`${form.bio.length}/160`}
         />
-        <Input
+        <DateOfBirthField
           label="Date of birth"
           optional
-          type="date"
           value={form.dateOfBirth}
-          onChange={set("dateOfBirth")}
+          onChange={(dateOfBirth) => setForm((f) => ({ ...f, dateOfBirth }))}
           error={fields.dateOfBirth}
-          max={new Date().toISOString().slice(0, 10)}
         />
         <div className="flex justify-end">
           <Button type="submit" loading={saving} disabled={!dirty}>

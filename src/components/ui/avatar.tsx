@@ -27,17 +27,20 @@ type Props = {
   name: string;
   src?: string | null;
   size?: number;
+  /** Squircle (superellipse) for headers; circles everywhere else. */
+  shape?: "circle" | "squircle";
   className?: string;
 };
 
 /** Photo when visible to the viewer, otherwise brand-gradient initials. */
-export function Avatar({ name, src, size = 40, className }: Props) {
+export function Avatar({ name, src, size = 40, shape = "circle", className }: Props) {
   const [failed, setFailed] = useState<string | null>(null);
   const showImage = src && failed !== src;
   return (
     <span
       className={cn(
-        "relative inline-grid shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br font-bold text-white select-none",
+        "relative inline-grid shrink-0 place-items-center overflow-hidden bg-gradient-to-br font-bold text-white select-none",
+        shape === "squircle" ? "squircle" : "rounded-full",
         GRADIENTS[hash(name) % GRADIENTS.length],
         className,
       )}
@@ -57,7 +60,7 @@ export function Avatar({ name, src, size = 40, className }: Props) {
           draggable={false}
         />
       ) : (
-        initials(name)
+        <span data-initials={initials(name)} className="before:content-[attr(data-initials)]" />
       )}
     </span>
   );

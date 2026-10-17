@@ -25,13 +25,15 @@ export const POST = route(async (req) => {
         displayName: input.displayName,
         bio: input.bio || null,
         dateOfBirth: input.dateOfBirth ? new Date(`${input.dateOfBirth}T00:00:00Z`) : null,
+        // Claims the name in the namespace shared with personal contacts (same statement).
+        handle: { create: { handleLower: input.username } },
       },
       select: meSelect,
     });
   } catch (err) {
     const fields = uniqueViolation(err);
     if (!fields) throw err;
-    const isUsername = fields.some((f) => f.includes("username"));
+    const isUsername = fields.some((f) => f.includes("username") || f.includes("handle"));
     throw new ApiError(409, "conflict", "That account already exists.", {
       [isUsername ? "username" : "email"]: isUsername ? "That username is taken" : "An account with this email already exists",
     });

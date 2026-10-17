@@ -140,11 +140,18 @@ export type ChatDetailDTO = {
   myRole: "OWNER" | "ADMIN" | "MEMBER" | null;
   description: string | null;
   page: MessagePage;
+  /** When the server built this. A chat opened from the browser's prefetch cache can be up to ~30 s old and catches up on mount. */
+  generatedAt: string;
 };
 
 export type ChatSettingsDTO = Pick<ChatListItemDTO, "pinned" | "archived" | "muted" | "markedUnread">;
 
-export type UserProfileDTO = PeerDTO & { bio: string | null; blockedByMe: boolean };
+export type UserProfileDTO = PeerDTO & {
+  bio: string | null;
+  blockedByMe: boolean;
+  /** My private nickname for them (only I see it), or null. */
+  alias: string | null;
+};
 
 /** Events published by the server to `user:{id}` Ably channels. */
 export type RealtimeEvent =

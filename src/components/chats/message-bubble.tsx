@@ -1,7 +1,7 @@
 "use client";
 
-import { memo, useSyncExternalStore } from "react";
-import { animate, motion, useMotionValue, useTransform } from "motion/react";
+import { memo } from "react";
+import { animate, AnimatePresence, motion, useDragControls, useMotionValue, useTransform } from "motion/react";
 import { AlertCircle, Check, CheckCheck, Clock3, Forward, Pin, Reply, Star } from "lucide-react";
 import { useLongPress } from "@/components/ui/action-menu";
 import { Avatar } from "@/components/ui/avatar";
@@ -38,10 +38,12 @@ function Ticks({ receipt, onBrand }: { receipt: Receipt; onBrand: boolean }) {
   );
 }
 
-const coarse = () => window.matchMedia("(pointer: coarse)").matches;
-const useTouch = () => useSyncExternalStore(() => () => {}, coarse, () => false);
 
 const SWIPE_TRIGGER = 64;
+/** Reaction chips beside a bubble: at most this many (the last becomes "+N"), each CHIP_H tall. */
+const REACTION_CHIPS = 3;
+const CHIP_H = 28;
+const CHIP_GAP = 4;
 
 /** Group events ("Ada added Grace") as a centered pill. */
 function SystemLine({ message }: { message: UiMessage }) {
@@ -74,11 +76,17 @@ export const MessageBubble = memo(function MessageBubble(props: Props) {
 function Bubble({ message, mine, groupStart, groupEnd, animate: animateIn, receipt, highlighted }: Props) {
   const actions = useChatActions();
   const showPeople = actions.isGroup && !mine;
-  const touch = useTouch();
   const x = useMotionValue(0);
   const replyIconOpacity = useTransform(x, [-SWIPE_TRIGGER, -16, 0], [1, 0, 0]);
   const interactive = !actions.readOnly && !message.deleted && message.status === "sent";
   const longPress = useLongPress((point) => actions.openMenu(message, point), interactive);
+  // Swipe to reply starts from a touch press (not from a "touch device?" check at
+  // render, which differs between server and client and re-rendered every bubble).
+  const drag = useDragControls();
+  const onPointerDown = (e: React.PointerEvent) => {
+    longPress.onPointerDown?.(e);
+    if (interactive && e.pointerType === "touch") drag.start(e);
+  };
 
   const jumbo = !message.deleted && !message.attachments.length && isJumboEmoji(message.text);
   const media = message.attachments.find((a) => a.kind === "IMAGE" || a.kind === "VIDEO");
@@ -104,38 +112,57 @@ function Bubble({ message, mine, groupStart, groupEnd, animate: animateIn, recei
     </span>
   );
 
-  const reactions = message.reactions.length > 0 && (
-    <div className={cn("mt-1.5 flex flex-wrap gap-1", jumbo && "justify-end")}>
-      {message.reactions.map((r) => {
-        const reacted = r.userIds.includes(actions.meId);
-        return (
+  // Reactions sit outside the bubble, centred on it: left of mine, right of
+  // theirs. Absolutely placed, so adding one never resizes the bubble; the row
+  // reserves the column's height so it can't overlap the next message.
+  const shown = message.reactions.length > REACTION_CHIPS ? message.reactions.slice(0, REACTION_CHIPS - 1) : message.reactions;
+  const hidden = message.reactions.length - shown.length;
+  const chipCount = shown.length + (hidden > 0 ? 1 : 0);
+  const stackHeight = chipCount ? chipCount * CHIP_H + (chipCount - 1) * CHIP_GAP : 0;
+  const reactions = chipCount > 0 && (
+    <div
+      className={cn("absolute top-1/2 z-[1] flex -translate-y-1/2 flex-col gap-1", mine ? "right-full mr-1.5 items-end" : "left-full ml-1.5 items-start")}
+      role="group"
+      aria-label="Reactions"
+    >
+      <AnimatePresence initial={false}>
+        {shown.map((r) => {
+          const reacted = r.userIds.includes(actions.meId);
+          return (
+            <motion.button
+              key={r.emoji}
+              type="button"
+              initial={{ scale: 0.4, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.4, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 700, damping: 26 }}
+              whileTap={{ scale: 0.85 }}
+              onClick={() => actions.showReactions(message)}
+              aria-label={`${r.emoji} ${r.userIds.length}${reacted ? ", including you" : ""}. Show who reacted`}
+              className={cn(
+                "inline-flex h-7 shrink-0 items-center gap-1 rounded-full px-2 text-[14px] font-semibold whitespace-nowrap",
+                reacted ? "glass-primary" : "glass-2 text-fg",
+              )}
+            >
+              <span>{r.emoji}</span>
+              <span className="text-xs tabular-nums">{r.userIds.length}</span>
+            </motion.button>
+          );
+        })}
+        {hidden > 0 && (
           <motion.button
-            key={r.emoji}
+            key="more"
             type="button"
-            layout
-            initial={{ scale: 0.6 }}
-            animate={{ scale: 1 }}
-            whileTap={{ scale: 0.85 }}
-            onClick={() => actions.toggleReaction(message, r.emoji)}
-            disabled={actions.readOnly}
-            aria-pressed={reacted}
-            aria-label={`${r.emoji} ${r.userIds.length}${reacted ? ", including you" : ""}`}
-            className={cn(
-              "inline-flex h-7 items-center gap-1 rounded-full px-2 text-[14px] font-semibold transition-colors",
-              mine
-                ? reacted
-                  ? "bg-white text-[#0f3d6e]"
-                  : "bg-white/18 text-white"
-                : reacted
-                  ? "glass-primary"
-                  : "glass-1 text-fg",
-            )}
+            initial={{ scale: 0.4, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            onClick={() => actions.showReactions(message)}
+            aria-label={`${hidden} more reactions`}
+            className="glass-2 inline-flex h-7 items-center rounded-full px-2 text-xs font-bold text-muted"
           >
-            <span>{r.emoji}</span>
-            {r.userIds.length > 1 && <span className="text-xs">{r.userIds.length}</span>}
+            +{hidden}
           </motion.button>
-        );
-      })}
+        )}
+      </AnimatePresence>
     </div>
   );
 
@@ -144,7 +171,7 @@ function Bubble({ message, mine, groupStart, groupEnd, animate: animateIn, recei
       className={cn("relative flex px-3 sm:px-5", mine ? "justify-end" : "justify-start", groupStart ? "pt-2" : "pt-[3px]")}
       data-message-id={message.id}
     >
-      {touch && interactive && (
+      {interactive && (
         <motion.span
           style={{ opacity: replyIconOpacity }}
           className="pointer-events-none absolute top-1/2 right-4 grid size-8 -translate-y-1/2 place-items-center rounded-full bg-surface-3 text-accent"
@@ -157,8 +184,9 @@ function Bubble({ message, mine, groupStart, groupEnd, animate: animateIn, recei
         initial={animateIn ? { opacity: 0, y: 12, scale: 0.96, x: mine ? 12 : -12 } : false}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: "spring", stiffness: 520, damping: 34, mass: 0.7 }}
-        style={{ transformOrigin: mine ? "bottom right" : "bottom left", x, touchAction: "pan-y" }}
-        drag={touch && interactive ? "x" : false}
+        drag={interactive ? "x" : false}
+        dragListener={false}
+        dragControls={drag}
         dragDirectionLock
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={{ left: 0.45, right: 0 }}
@@ -170,88 +198,91 @@ function Bubble({ message, mine, groupStart, groupEnd, animate: animateIn, recei
           animate(x, 0, { type: "spring", stiffness: 600, damping: 40 });
         }}
         className={cn("flex max-w-[min(82%,560px)] items-end gap-2", mine && "flex-row-reverse")}
+        style={{ transformOrigin: mine ? "bottom right" : "bottom left", x, touchAction: "pan-y", minHeight: stackHeight || undefined }}
         {...longPress}
+        onPointerDown={onPointerDown}
       >
         {showPeople && (
           <span className="w-8 shrink-0 self-end">
             {groupEnd && <Avatar name={actions.nameOf(message.senderId)} src={actions.avatarOf(message.senderId)} size={32} />}
           </span>
         )}
-        <div
-          className={cn(
-            "relative min-w-0 text-[15px] leading-[1.4] transition-shadow duration-500",
-            jumbo
-              ? "flex flex-col px-1 text-[44px] leading-[1.15] tracking-[-0.05em]"
-              : cn(
-                  "rounded-[20px]",
-                  mediaOnly ? "overflow-hidden p-1" : "px-3.5 pt-2 pb-2",
-                  mine ? "bubble-sent" : "glass-1 text-fg",
-                  groupEnd && (mine ? "rounded-br-[6px]" : "rounded-bl-[6px]"),
-                  !groupStart && (mine ? "rounded-tr-[8px]" : "rounded-tl-[8px]"),
-                ),
-            highlighted && "ring-4 ring-accent/60",
-            message.status === "sending" && !uploading && "opacity-80",
-          )}
-        >
-          {showPeople && groupStart && !jumbo && (
-            <p className={cn("mb-0.5 truncate text-[13px] font-bold", message.senderId && nameColor(message.senderId))}>
-              {actions.nameOf(message.senderId)}
-            </p>
-          )}
-          {message.forwardedFromName && !message.deleted && (
-            <p className={cn("mb-1 flex items-center gap-1 text-[13px] font-semibold", mine ? "text-white/85" : "text-accent")}>
-              <Forward className="size-3.5" aria-hidden="true" /> Forwarded from {message.forwardedFromName}
-            </p>
-          )}
-          {message.replyTo && !message.deleted && (
-            <button
-              type="button"
-              onClick={() => actions.jumpTo(message.replyTo!.id)}
-              className={cn(
-                "mb-1.5 block w-full max-w-[300px] rounded-[10px] border-l-[3px] px-2.5 py-1 text-left",
-                mine ? "border-white/80 bg-white/14" : "border-accent bg-accent-soft",
-              )}
-            >
-              <span className={cn("block truncate text-[13px] font-semibold", mine ? "text-white" : "text-accent")}>
-                {actions.nameOf(message.replyTo.senderId)}
-              </span>
-              <span className={cn("block truncate text-[13px]", mine ? "text-white/80" : "text-muted")}>{snippetOf(message.replyTo)}</span>
-            </button>
-          )}
-          {message.deleted ? (
-            <span className="italic opacity-75">Message deleted</span>
-          ) : (
-            <>
-              {message.attachments.length > 0 && (
-                <div className={cn("relative", message.text && "mb-1.5")}>
-                  <Attachments attachments={message.attachments} mine={mine} canDownload={!actions.readOnly} />
-                  {uploading && (
-                    <span className="absolute inset-0 grid place-items-center rounded-[14px] bg-black/35">
-                      <svg viewBox="0 0 36 36" className="size-12 -rotate-90" aria-label={`Uploading ${Math.round((message.upload ?? 0) * 100)}%`}>
-                        <circle cx="18" cy="18" r="15" fill="none" stroke="rgb(255 255 255 / 0.3)" strokeWidth="3" />
-                        <circle
-                          cx="18"
-                          cy="18"
-                          r="15"
-                          fill="none"
-                          stroke="white"
-                          strokeWidth="3"
-                          strokeLinecap="round"
-                          strokeDasharray={`${(message.upload ?? 0) * 94.2} 94.2`}
-                        />
-                      </svg>
-                    </span>
-                  )}
-                </div>
-              )}
-              {message.text && <MessageText text={message.text} />}
-              {message.linkPreview && <LinkPreviewCard preview={message.linkPreview} mine={mine} />}
-            </>
-          )}
-          {!jumbo && reactions}
-          {meta}
+        <div className={cn("relative min-w-0", stackHeight > 0 && "self-center")}>
+          <div
+            className={cn(
+              "relative min-w-0 text-[15px] leading-[1.4] transition-shadow duration-500",
+              jumbo
+                ? "flex flex-col px-1 text-[44px] leading-[1.15] tracking-[-0.05em]"
+                : cn(
+                    "rounded-[20px]",
+                    mediaOnly ? "overflow-hidden p-1" : "px-3.5 pt-2 pb-2",
+                    mine ? "bubble-sent" : "glass-1 text-fg",
+                    groupEnd && (mine ? "rounded-br-[6px]" : "rounded-bl-[6px]"),
+                    !groupStart && (mine ? "rounded-tr-[8px]" : "rounded-tl-[8px]"),
+                  ),
+              highlighted && "ring-4 ring-accent/60",
+              message.status === "sending" && !uploading && "opacity-80",
+            )}
+          >
+            {showPeople && groupStart && !jumbo && (
+              <p className={cn("mb-0.5 truncate text-[13px] font-bold", message.senderId && nameColor(message.senderId))}>
+                {actions.nameOf(message.senderId)}
+              </p>
+            )}
+            {message.forwardedFromName && !message.deleted && (
+              <p className={cn("mb-1 flex items-center gap-1 text-[13px] font-semibold", mine ? "text-white/85" : "text-accent")}>
+                <Forward className="size-3.5" aria-hidden="true" /> Forwarded from {message.forwardedFromName}
+              </p>
+            )}
+            {message.replyTo && !message.deleted && (
+              <button
+                type="button"
+                onClick={() => actions.jumpTo(message.replyTo!.id)}
+                className={cn(
+                  "mb-1.5 block w-full max-w-[300px] rounded-[10px] border-l-[3px] px-2.5 py-1 text-left",
+                  mine ? "border-white/80 bg-white/14" : "border-accent bg-accent-soft",
+                )}
+              >
+                <span className={cn("block truncate text-[13px] font-semibold", mine ? "text-white" : "text-accent")}>
+                  {actions.nameOf(message.replyTo.senderId)}
+                </span>
+                <span className={cn("block truncate text-[13px]", mine ? "text-white/80" : "text-muted")}>{snippetOf(message.replyTo)}</span>
+              </button>
+            )}
+            {message.deleted ? (
+              <span className="italic opacity-75">Message deleted</span>
+            ) : (
+              <>
+                {message.attachments.length > 0 && (
+                  <div className={cn("relative", message.text && "mb-1.5")}>
+                    <Attachments attachments={message.attachments} mine={mine} canDownload={!actions.readOnly} />
+                    {uploading && (
+                      <span className="absolute inset-0 grid place-items-center rounded-[14px] bg-black/35">
+                        <svg viewBox="0 0 36 36" className="size-12 -rotate-90" aria-label={`Uploading ${Math.round((message.upload ?? 0) * 100)}%`}>
+                          <circle cx="18" cy="18" r="15" fill="none" stroke="rgb(255 255 255 / 0.3)" strokeWidth="3" />
+                          <circle
+                            cx="18"
+                            cy="18"
+                            r="15"
+                            fill="none"
+                            stroke="white"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeDasharray={`${(message.upload ?? 0) * 94.2} 94.2`}
+                          />
+                        </svg>
+                      </span>
+                    )}
+                  </div>
+                )}
+                {message.text && <MessageText text={message.text} />}
+                {message.linkPreview && <LinkPreviewCard preview={message.linkPreview} mine={mine} />}
+              </>
+            )}
+            {meta}
+          </div>
+          {reactions}
         </div>
-        {jumbo && reactions}
         {message.status === "failed" && message.clientId && (
           <button
             type="button"

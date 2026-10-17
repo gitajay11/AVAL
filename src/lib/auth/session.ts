@@ -1,4 +1,5 @@
 import "server-only";
+import { cacheLife } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
@@ -54,8 +55,15 @@ export function clearSessionCookie(res: NextResponse) {
   res.cookies.set(SESSION_COOKIE, "", { ...sessionCookieOptions, maxAge: 0 });
 }
 
-/** The current session, validated against the database. Deduped per request. */
-export const getSession = cache(async (): Promise<CurrentSession | null> => {
+/**
+ * The session row behind the cookie, checked against the clock. A private
+ * cache scope: reading cookies and the time here keeps prefetches of signed-in
+ * pages valid, and the result is never stored on the server across requests
+ * (stale: Infinity = per-request dedupe only, no effect on the route's stale time).
+ */
+async function readSession() {
+  "use cache: private";
+  cacheLife({ stale: Infinity });
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token || token.length !== 43) return null;
 
@@ -71,14 +79,26 @@ export const getSession = cache(async (): Promise<CurrentSession | null> => {
     },
   });
   if (!session) return null;
-
   const now = Date.now();
-  if (session.expiresAt.getTime() <= now) {
+  return {
+    id: session.id,
+    user: session.user,
+    expired: session.expiresAt.getTime() <= now,
+    // Sliding expiry is due (the cookie's Max-Age is refreshed by proxy.ts).
+    touchAt: now - session.lastUsedAt.getTime() > TOUCH_INTERVAL_MS ? now : null,
+  };
+}
+
+/** The current session, validated against the database. Deduped per request. */
+export const getSession = cache(async (): Promise<CurrentSession | null> => {
+  const session = await readSession();
+  if (!session) return null;
+  if (session.expired) {
     await db.session.delete({ where: { id: session.id } }).catch(() => {});
     return null;
   }
-  if (now - session.lastUsedAt.getTime() > TOUCH_INTERVAL_MS) {
-    // Sliding expiry. The cookie's Max-Age is refreshed by proxy.ts.
+  if (session.touchAt !== null) {
+    const now = session.touchAt;
     await db.session
       .update({
         where: { id: session.id },

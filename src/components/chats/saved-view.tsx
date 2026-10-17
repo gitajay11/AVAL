@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { IdleLink as Link } from "@/components/ui/idle-link";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { ChevronLeft, Star, StarOff } from "lucide-react";
@@ -11,6 +11,7 @@ import { ClientTime, formatListTime } from "@/lib/client/time";
 import type { StarredItem } from "@/lib/chats/starred";
 import { snippetOf } from "./message-snippet";
 import { MessageText } from "./message-text";
+import { FloatingBar } from "@/components/ui/floating-bar";
 
 /** My starred messages across all chats, newest saved first. */
 export function SavedView({ initial, initialCursor }: { initial: StarredItem[]; initialCursor: string | null }) {
@@ -38,12 +39,12 @@ export function SavedView({ initial, initialCursor }: { initial: StarredItem[]; 
 
   return (
     <div className="h-full overflow-y-auto">
-      <header className="glass sticky top-0 z-10 flex items-center gap-2 border-b border-line px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3">
+      <FloatingBar className="flex items-center gap-2 px-2 py-2">
         <Link href="/chats" className="grid size-10 place-items-center rounded-xl text-fg hover:bg-surface-3 md:hidden" aria-label="Back to chats">
           <ChevronLeft className="size-6" />
         </Link>
-        <h1 className="px-1 text-xl font-extrabold tracking-tight">Starred messages</h1>
-      </header>
+        <h1 className="floating-title px-1 text-xl font-extrabold tracking-tight">Starred messages</h1>
+      </FloatingBar>
       <div className="mx-auto flex max-w-2xl flex-col gap-3 px-4 py-5 pb-[max(2rem,env(safe-area-inset-bottom))]">
         {items.length === 0 && (
           <div className="flex flex-col items-center gap-3 pt-16 text-center">

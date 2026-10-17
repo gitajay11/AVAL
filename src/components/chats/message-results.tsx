@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { IdleLink as Link } from "@/components/ui/idle-link";
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Spinner } from "@/components/ui/spinner";
@@ -46,7 +46,7 @@ export function MessageResults({ query, meId, onOpened }: { query: string; meId:
 
   return (
     <section aria-label="Messages">
-      <h3 className="px-5 pt-3 pb-1.5 text-xs font-bold tracking-wide text-muted uppercase">Messages</h3>
+      <h3 className="px-5 pt-3 pb-1.5 text-xs font-bold tracking-wide text-fg/80 uppercase">Messages</h3>
       {!current ? (
         <div className="flex justify-center py-3 text-subtle">
           <Spinner className="size-5" />
@@ -54,10 +54,10 @@ export function MessageResults({ query, meId, onOpened }: { query: string; meId:
       ) : current.hits.length === 0 ? (
         <p className="px-5 py-2 text-sm text-muted">No messages found.</p>
       ) : (
-        <ul className="flex flex-col gap-0.5 pb-2">
+        <ul className="flex flex-col gap-1.5 pb-2">
           {current.hits.map((h) => (
             <li key={h.message.id} className="mx-2">
-              <Link href={`/chats/${h.chat.id}?m=${h.message.id}`} onClick={onOpened} className="flex items-center gap-3 rounded-2xl px-2.5 py-2 hover:bg-surface-2">
+              <Link href={`/chats/${h.chat.id}?m=${h.message.id}`} onClick={onOpened} className="glass-1 glass-sheen flex items-center gap-3 rounded-2xl px-2.5 py-2 transition-transform active:scale-[0.97]">
                 <Avatar name={h.chat.title} src={h.chat.avatarUrl} size={44} />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-baseline gap-2">

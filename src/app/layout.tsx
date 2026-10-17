@@ -1,10 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { Backdrop } from "@/components/app/backdrop";
-import { installScript } from "@/components/app/pwa";
 import { Providers } from "@/components/providers";
-import { themeScript } from "@/components/theme";
 import "./globals.css";
+import { installScript, themeScript } from "@/lib/inline-scripts";
 
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-jakarta",

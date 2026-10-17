@@ -39,6 +39,7 @@ export async function getChatDetail(me: SessionUser, chatId: string): Promise<Ch
       myRole: null,
       description: null,
       page,
+      generatedAt: new Date().toISOString(),
     };
   }
 
@@ -82,5 +83,6 @@ export async function getChatDetail(me: SessionUser, chatId: string): Promise<Ch
     myRole: isGroup ? m.role : null,
     description: group?.description ?? null,
     page,
+    generatedAt: new Date().toISOString(),
   };
 }

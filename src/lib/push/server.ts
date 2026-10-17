@@ -51,7 +51,10 @@ export async function pushToUser(userId: string, payload: PushPayload, opts: { u
       } catch (err) {
         const status = (err as { statusCode?: number }).statusCode;
         if (status === 404 || status === 410) await db.pushSubscription.delete({ where: { id: s.id } }).catch(() => {});
-        else console.warn("[push] send failed", status ?? (err as Error).message);
+        else {
+          const e = err as Error & { code?: string; body?: string };
+          console.warn("[push] send failed", status ?? e.code ?? e.message, e.body ? String(e.body).slice(0, 120) : "");
+        }
       }
     }),
   );

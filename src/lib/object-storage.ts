@@ -94,8 +94,32 @@ export async function readHead(key: string, n = 32): Promise<Uint8Array> {
   return res.Body ? await res.Body.transformToByteArray() : new Uint8Array();
 }
 
+const AVATAR_PREFIX = /^(avatars|contacts|groups)\//;
+
+/**
+ * Avatars are stored twice: the 512px picture at `key` and a 1080px copy for the
+ * full-screen viewer beside it (`…/<uuid>@full.webp`).
+ */
+export function fullAvatarKey(key: string): string {
+  return key.replace(/(\.[a-z0-9]+)$/, "@full$1");
+}
+
 export async function deleteObject(key: string) {
-  await s3().send(new DeleteObjectCommand({ Bucket: bucket(), Key: key })).catch((err) => {
-    console.error("[storage] delete failed", key, err);
-  });
+  const keys = AVATAR_PREFIX.test(key) && !key.includes("@full.") ? [key, fullAvatarKey(key)] : [key];
+  await Promise.all(
+    keys.map((k) =>
+      s3()
+        .send(new DeleteObjectCommand({ Bucket: bucket(), Key: k }))
+        .catch((err) => console.error("[storage] delete failed", k, err)),
+    ),
+  );
+}
+
+/** Signed URL for an avatar: the full-size copy when asked for and present, else the 512px one. */
+export async function presignAvatar(key: string, size: string | null, expiresIn: number): Promise<string> {
+  if (size === "full") {
+    const full = fullAvatarKey(key);
+    if (await headObject(full)) return presignDownload(full, { expiresIn });
+  }
+  return presignDownload(key, { expiresIn });
 }

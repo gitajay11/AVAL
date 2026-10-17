@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { singleLine } from "./common";
 import { bio, dateOfBirth, displayName } from "./auth";
 import { AUDIENCES, AVATAR_MAX_BYTES, AVATAR_TYPES } from "./limits";
 
@@ -33,6 +34,15 @@ export const AvatarUploadSchema = z.object({
   /** Set to upload a group's photo (admins only). */
   chatId: z.uuid().optional(),
   size: z.number().int().positive().max(AVATAR_MAX_BYTES, "Avatar must be 5 MB or smaller"),
+  /** Byte size of the optional 1080px copy (same type), for the full-screen viewer. */
+  fullSize: z.number().int().positive().max(AVATAR_MAX_BYTES, "Avatar must be 5 MB or smaller").optional(),
 });
 
 export const ConfirmUploadSchema = z.object({ uploadId: z.uuid() });
+
+/** A private nickname for someone; null (or empty) resets it. */
+export const AliasSchema = z.object({
+  alias: singleLine(64)
+    .transform((v) => v || null)
+    .nullable(),
+});

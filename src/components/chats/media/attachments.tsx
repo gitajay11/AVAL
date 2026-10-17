@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Download, EyeOff, FileText, ImageOff } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { AttachmentDTO, LinkPreviewDTO } from "@/lib/chats/types";
@@ -21,6 +21,20 @@ function fit(width: number | null, height: number | null) {
 function ImageAttachment({ a, canDownload }: { a: AttachmentDTO; canDownload: boolean }) {
   const open = useLightbox();
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  // A sent photo switches from the local preview to the server copy: keep
+  // showing the preview until the new one has decoded, so it never blanks.
+  const [src, setSrc] = useState(a.url);
+  useEffect(() => {
+    if (a.url === src) return;
+    let live = true;
+    const next = new Image();
+    next.src = a.url;
+    const swap = () => live && setSrc(a.url);
+    next.decode().then(swap, swap);
+    return () => {
+      live = false;
+    };
+  }, [a.url, src]);
   const box = fit(a.width, a.height);
   return (
     <button
@@ -37,13 +51,16 @@ function ImageAttachment({ a, canDownload }: { a: AttachmentDTO; canDownload: bo
       ) : (
         // eslint-disable-next-line @next/next/no-img-element -- signed per-viewer media URL
         <img
-          src={a.url}
+          src={src}
           alt={a.fileName ?? "Photo"}
           loading="lazy"
           decoding="async"
           onLoad={() => setState("ready")}
           onError={() => setState("error")}
-          className={cn("size-full object-cover transition-opacity duration-300", state === "ready" ? "opacity-100" : "opacity-0")}
+          className={cn(
+            "size-full object-cover transition-[opacity,filter] duration-300 motion-reduce:transition-none",
+            state === "ready" ? "opacity-100 blur-0" : "opacity-0 blur-md",
+          )}
         />
       )}
       {state === "loading" && <span className="absolute inset-0 animate-pulse bg-surface-3" aria-hidden="true" />}
@@ -105,15 +122,16 @@ function FileAttachment({ a, mine, canDownload }: { a: AttachmentDTO; mine: bool
 export function Attachments({ attachments, mine, canDownload = true }: { attachments: AttachmentDTO[]; mine: boolean; canDownload?: boolean }) {
   return (
     <div className="flex flex-col gap-1.5">
-      {attachments.map((a) =>
+      {/* Keyed by position: the id changes when the local preview becomes the sent copy. */}
+      {attachments.map((a, i) =>
         a.kind === "IMAGE" ? (
-          <ImageAttachment key={a.id} a={a} canDownload={canDownload} />
+          <ImageAttachment key={i} a={a} canDownload={canDownload} />
         ) : a.kind === "VIDEO" ? (
-          <VideoAttachment key={a.id} a={a} canDownload={canDownload} />
+          <VideoAttachment key={i} a={a} canDownload={canDownload} />
         ) : a.kind === "VOICE" ? (
-          <VoicePlayer key={a.id} a={a} mine={mine} />
+          <VoicePlayer key={i} a={a} mine={mine} />
         ) : (
-          <FileAttachment key={a.id} a={a} mine={mine} canDownload={canDownload} />
+          <FileAttachment key={i} a={a} mine={mine} canDownload={canDownload} />
         ),
       )}
     </div>
