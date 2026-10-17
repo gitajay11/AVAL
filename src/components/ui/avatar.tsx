@@ -37,7 +37,8 @@ export function Avatar({ name, src, size = 40, className }: Props) {
   return (
     <span
       className={cn(
-        "relative inline-grid aspect-square shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br font-bold text-white select-none",
+        // align-top: not on the text baseline, so no descender gap under it in any container.
+        "relative inline-grid aspect-square shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br align-top font-bold text-white select-none",
         GRADIENTS[hash(name) % GRADIENTS.length],
         className,
       )}

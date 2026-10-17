@@ -79,7 +79,7 @@ function SenderAvatar({ userId }: { userId: string }) {
     <button
       type="button"
       onClick={(e) => (src ? viewPhoto({ el: e.currentTarget, src, name, username: actions.usernameOf(userId) }) : actions.showMember(userId))}
-      className="block rounded-full transition-transform active:scale-95"
+      className="grid rounded-full transition-transform active:scale-95"
       aria-label={src ? `View ${name}'s photo` : `${name}'s profile`}
     >
       <Avatar name={name} src={src} size={32} />
