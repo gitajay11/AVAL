@@ -286,6 +286,10 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
       case "chat.removed":
         if (e.data.chatId === chatId) leave();
         break;
+      case "user.updated":
+        // A member's new photo or name, beside their messages.
+        if (members.some((m) => m.id === e.data.userId)) refreshMembers();
+        break;
       case "message.updated":
         if (e.data.message.chatId === chatId) onUpdated(e.data.message);
         break;

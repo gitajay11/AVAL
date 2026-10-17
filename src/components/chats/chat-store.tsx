@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useRealtime, useRealtimeEvent } from "@/components/realtime/realtime-provider";
 import { useToast } from "@/components/ui/toast";
@@ -143,6 +144,7 @@ export function ChatsProvider({
   children: React.ReactNode;
 }) {
   const toast = useToast();
+  const router = useRouter();
   const [state, dispatch] = useReducer(reducer, { chats: sortChats(initialChats) });
   const [activeChatId, setActiveChat] = useState<string | null>(null);
   const [typing, setTyping] = useState<TypingMap>({});
@@ -273,6 +275,15 @@ export function ChatsProvider({
         break;
       case "resync":
         refresh().catch(() => {});
+        break;
+      case "user.updated":
+        if (e.data.userId === meId) {
+          // My own photo or name, changed on another device: re-read my profile.
+          router.refresh();
+        } else if (chatsRef.current.some((c) => c.peer?.id === e.data.userId || c.type === "GROUP")) {
+          // Their 1:1 chat (photo, name) or a group they may be in (who sent the last message).
+          refresh().catch(() => {});
+        }
         break;
     }
   });

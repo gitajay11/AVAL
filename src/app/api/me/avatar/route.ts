@@ -2,6 +2,7 @@ import { json, route } from "@/lib/api";
 import { requireSession } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { deleteObject } from "@/lib/object-storage";
+import { profileChanged } from "@/lib/profile-events";
 import { meSelect, toMe } from "@/lib/users";
 
 /** Remove the profile photo. */
@@ -13,5 +14,6 @@ export const DELETE = route(async () => {
     ...(avatarKey ? [db.attachment.deleteMany({ where: { objectKey: avatarKey } })] : []),
   ]);
   if (avatarKey) await deleteObject(avatarKey);
+  await profileChanged(user.id);
   return json({ user: toMe(row) });
 });
