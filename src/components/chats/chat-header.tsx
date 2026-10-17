@@ -127,11 +127,11 @@ export function ChatHeader({ chat, readOnly, nameOf, onSearch, pinned, onOpenPro
           onClick={(e) =>
             chat.avatarUrl ? viewPhoto({ el: e.currentTarget, src: chat.avatarUrl, name: chat.title, username: chat.peer?.username }) : onOpenProfile()
           }
-          className="relative ml-0.5 shrink-0 rounded-full transition-transform active:scale-95"
+          className="relative ml-0.5 grid size-10 shrink-0 place-items-center rounded-full transition-transform active:scale-95"
           aria-label={chat.avatarUrl ? `View ${chat.title}'s photo` : chat.type === "GROUP" ? `${chat.title} info` : `${chat.title}'s profile`}
         >
-          <span className="block rounded-full bg-gradient-to-br from-[var(--jade)] to-[var(--ocean)] p-[2px]">
-            <Avatar name={chat.title} src={chat.avatarUrl} size={36} className="ring-[1.5px] ring-[var(--bg)]" />
+          <span className="grid size-10 place-items-center rounded-full bg-gradient-to-br from-[var(--jade)] to-[var(--ocean)]">
+            <Avatar name={chat.title} src={chat.avatarUrl} size={34} className="ring-[1.5px] ring-[var(--bg)]" />
           </span>
           {online && (
             <span className="absolute right-0 bottom-0 size-3 rounded-full bg-[var(--mint)] ring-2 ring-[var(--bg)]" aria-hidden="true" />

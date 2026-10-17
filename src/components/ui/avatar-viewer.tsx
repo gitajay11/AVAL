@@ -43,7 +43,7 @@ export function ViewableAvatar({ name, src, size, className, username }: { name:
   const view = useAvatarViewer();
   if (!src) return <Avatar name={name} src={null} size={size} className={className} />;
   return (
-    <button type="button" onClick={(e) => view({ el: e.currentTarget, src, name, username })} className="rounded-full" aria-label={`View ${name}'s photo`}>
+    <button type="button" onClick={(e) => view({ el: e.currentTarget, src, name, username })} className="grid rounded-full" aria-label={`View ${name}'s photo`}>
       <Avatar name={name} src={src} size={size} className={className} />
     </button>
   );
