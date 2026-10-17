@@ -418,58 +418,83 @@
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath fill-rule='evenodd' fill='rgba(0,0,0,0.5)' d='M0 0H100V100H0Z M50 0C88 0 100 12 100 50s-12 50-50 50S0 88 0 50 12 0 50 0z'/%3E%3Cpath fill='none' stroke='rgba(255,255,255,0.7)' stroke-width='0.6' d='M50 0.3C87.8 0.3 99.7 12.2 99.7 50S87.8 99.7 50 99.7 0.3 87.8 0.3 50 12.2 0.3 50 0.3z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
 }
 
-/* Launch screen (app/layout.tsx): the logo over the theme background while the
-   app starts, then it fades away. Only shown when <html> has .launch. */
-.launch-screen {
-  display: none;
-}
-html.launch .launch-screen {
+/* Launch splash (app/layout.tsx; dismissed by components/app/launch-splash.tsx).
+   The brand background in every theme, matching the OS splash (manifest
+   background_color, iOS startup images) so the hand-off is seamless; the logo
+   and its glow sit exactly where the startup images draw them. */
+.splash {
   position: fixed;
   inset: 0;
   z-index: 100;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 18px;
-  background: var(--bg);
+  background: #07141a;
+  transition:
+    opacity 300ms ease,
+    visibility 0s linear 300ms;
+  /* Failsafe: gone after 6 s even if the script that dismisses it never runs. */
+  animation: splash-failsafe 300ms ease 6s forwards;
+}
+.splash.is-hiding {
+  opacity: 0;
+  visibility: hidden;
   pointer-events: none;
-  animation: launch-out 380ms ease-in 650ms forwards;
 }
-.launch-logo {
-  width: 128px;
-  height: 128px;
+.splash.is-gone {
+  display: none;
+}
+.splash-glow,
+.splash-logo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
   border-radius: 9999px;
-  box-shadow: 0 18px 50px -12px rgb(11 122 97 / 0.55);
-  animation: launch-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
-.launch-name {
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: 0.32em;
-  color: var(--text-muted);
-  animation: launch-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1) 80ms both;
+.splash-glow {
+  width: 288px;
+  height: 288px;
+  margin: -144px 0 0 -144px;
+  background: radial-gradient(closest-side, rgb(110 231 200 / 0.28), rgb(27 78 158 / 0.14) 45%, transparent);
 }
-@keyframes launch-in {
+.splash-logo {
+  width: 120px;
+  height: 120px;
+  margin: -60px 0 0 -60px;
+  /* Only the shared radial glow behind it (no extra shadow), so it matches the
+     iOS launch images exactly at the hand-off. */
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.08);
+  animation: splash-in 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.splash-version {
+  position: absolute;
+  bottom: calc(28px + env(safe-area-inset-bottom));
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: rgb(184 197 212 / 0.7);
+}
+@keyframes splash-in {
   from {
-    opacity: 0;
-    transform: scale(0.86);
+    opacity: 0.6;
+    transform: scale(0.94);
   }
 }
-@keyframes launch-out {
+@keyframes splash-failsafe {
   to {
     opacity: 0;
     visibility: hidden;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .launch-logo,
-  .launch-name {
-    animation: none;
+  /* A simple fade: no scale. */
+  .splash-logo {
+    animation-name: splash-fade-in;
   }
-  html.launch .launch-screen {
-    animation-duration: 200ms;
-    animation-delay: 500ms;
+  @keyframes splash-fade-in {
+    from {
+      opacity: 0.6;
+    }
   }
 }
 
