@@ -22,13 +22,17 @@ const PNG = { compressionLevel: 9, palette: true, quality: 92, effort: 10 } as c
 // The logo cropped to the circle itself (the source has transparent padding).
 const circle = await sharp(SOURCE).trim().png().toBuffer();
 
+// The trimmed logo is not exactly square (the leaf sticks out), so every resize
+// fits it inside the square: the default "cover" would cut its edges off.
+const CONTAIN = { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } } as const;
+
 /** The circle filling a transparent square ("any" icons, favicon, in-app logo). */
-const round = (size: number) => sharp(circle).resize(size, size, { kernel: "lanczos3" }).png(PNG).toBuffer();
+const round = (size: number) => sharp(circle).resize(size, size, { ...CONTAIN, kernel: "lanczos3" }).png(PNG).toBuffer();
 
 /** The circle at `scale` of the width, centred on the brand background (no transparency). */
 async function onBackground(size: number, scale: number) {
   const inner = Math.round(size * scale);
-  const logo = await sharp(circle).resize(inner, inner).png().toBuffer();
+  const logo = await sharp(circle).resize(inner, inner, CONTAIN).png().toBuffer();
   return sharp({ create: { width: size, height: size, channels: 4, background: BRAND_BG } })
     .composite([{ input: logo, gravity: "center" }])
     .flatten({ background: BRAND_BG })
@@ -46,7 +50,7 @@ async function startup(width: number, height: number, ratio: number) {
   const glow = Buffer.from(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${glowPx}" height="${glowPx}"><defs><radialGradient id="g"><stop offset="0" stop-color="#6ee7c8" stop-opacity="0.28"/><stop offset="0.45" stop-color="#1b4e9e" stop-opacity="0.14"/><stop offset="1" stop-color="#07141a" stop-opacity="0"/></radialGradient></defs><rect width="100%" height="100%" fill="url(#g)"/></svg>`,
   );
-  const logo = await sharp(circle).resize(logoPx, logoPx).png().toBuffer();
+  const logo = await sharp(circle).resize(logoPx, logoPx, CONTAIN).png().toBuffer();
   return sharp({ create: { width: width * ratio, height: height * ratio, channels: 4, background: BRAND_BG } })
     .composite([
       { input: glow, gravity: "center" },
@@ -62,7 +66,7 @@ async function startup(width: number, height: number, ratio: number) {
  * itself: the circle, with its light shapes (face, chat bubble) cut out.
  */
 async function badge(size: number) {
-  const { data, info } = await sharp(circle).resize(size * 4, size * 4).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { data, info } = await sharp(circle).resize(size * 4, size * 4, CONTAIN).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const out = Buffer.alloc(info.width * info.height * 4, 255);
   for (let i = 0; i < info.width * info.height; i++) {
     const [r, g, b, a] = [data[i * 4], data[i * 4 + 1], data[i * 4 + 2], data[i * 4 + 3]];
@@ -103,20 +107,22 @@ await mkdir(path.join(pub, "splash"), { recursive: true });
 const outputs: [string, Promise<Buffer>][] = [
   [file(ICONS.any192), round(192)],
   [file(ICONS.any512), round(512)],
-  // Maskable: launchers crop to their own shape; the logo stays inside the central 80% safe zone.
-  [file(ICONS.maskable512), onBackground(512, 0.8)],
+  // Maskable: Android draws it as an adaptive icon, which shows only the central
+  // two-thirds (the launcher icon and the launch screen, both masked to a circle).
+  // At 60% the whole logo, leaf and chat bubble included, stays inside that circle.
+  [file(ICONS.maskable512), onBackground(512, 0.6)],
   [file(ICONS.appleTouch), onBackground(180, 0.9)],
   [file(ICONS.favicon32), round(32)],
   [file(ICONS.badge), badge(72)],
   [
     file(ICONS.favicon),
     Promise.all(
-      [16, 32, 48].map(async (size) => ({ size, png: await sharp(circle).resize(size, size, { kernel: "lanczos3" }).sharpen({ sigma: 0.5 }).png().toBuffer() })),
+      [16, 32, 48].map(async (size) => ({ size, png: await sharp(circle).resize(size, size, { ...CONTAIN, kernel: "lanczos3" }).sharpen({ sigma: 0.5 }).png().toBuffer() })),
     ).then(ico),
   ],
   // In-app logo (components/ui/logo.tsx, the splash, the offline page).
-  [path.join(pub, "icons", "logo-256.webp"), sharp(circle).resize(256, 256).webp({ quality: 90, alphaQuality: 100 }).toBuffer()],
-  [path.join(pub, "icons", "logo-512.webp"), sharp(circle).resize(512, 512).webp({ quality: 88, alphaQuality: 100 }).toBuffer()],
+  [path.join(pub, "icons", "logo-256.webp"), sharp(circle).resize(256, 256, CONTAIN).webp({ quality: 90, alphaQuality: 100 }).toBuffer()],
+  [path.join(pub, "icons", "logo-512.webp"), sharp(circle).resize(512, 512, CONTAIN).webp({ quality: 88, alphaQuality: 100 }).toBuffer()],
   ...STARTUP_DEVICES.map((d) => [file(startupImage(d).url), startup(d.width, d.height, d.ratio)] as [string, Promise<Buffer>]),
 ];
 for (const [dest, data] of outputs) await writeFile(dest, await data);
