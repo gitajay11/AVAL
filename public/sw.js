@@ -17,7 +17,7 @@ const SHELL = `aval-${APP_VERSION}-shell-${VERSION}`;
 // In development the build assets aren't content-hashed, so nothing is cached.
 const CACHING = VERSION !== "dev";
 const OFFLINE_URL = "/offline.html";
-const PRECACHE = [OFFLINE_URL, "/icons/icon-192.png", "/icons/badge-72.png"];
+const PRECACHE = [OFFLINE_URL, "/icons/icon-192.png", "/icons/badge-72.png", "/icons/logo-256.webp"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
