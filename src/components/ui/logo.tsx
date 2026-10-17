@@ -14,7 +14,7 @@ export function LogoMark({ className }: { className?: string }) {
       width={256}
       height={256}
       draggable={false}
-      className={cn("size-10 shrink-0 rounded-full select-none", className)}
+      className={cn("size-10 shrink-0 select-none", className)}
     />
   );
 }

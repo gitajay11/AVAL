@@ -2,7 +2,7 @@
 // by `pnpm icons` (scripts/icons.mts) and referenced by the manifest, the page
 // head and the service worker. The version is in the file names: installed apps
 // and phones cache icons by URL, so new artwork must live at new URLs.
-export const ICON_VERSION = "v2";
+export const ICON_VERSION = "v3";
 
 /** The brand background behind the logo wherever an image can't be transparent. */
 export const BRAND_BG = "#07141A";
