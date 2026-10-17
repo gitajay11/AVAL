@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Ban, BellOff, Bell, Check, Flag, Search } from "lucide-react";
+import { Ban, BellOff, Bell, Check, Flag, Pencil, RotateCcw, Search } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
+import { ViewableAvatar } from "@/components/ui/avatar-viewer";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/field";
+import { Input, Textarea } from "@/components/ui/field";
 import { Sheet } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
@@ -216,10 +217,28 @@ export function ProfileSheet({
   onBlockChanged: () => void;
 }) {
   const toast = useToast();
-  const { updateSettings } = useChats();
+  const { updateSettings, refetchChat } = useChats();
   const [profile, setProfile] = useState<UserProfileDTO | null>(null);
   const [busy, setBusy] = useState(false);
+  const [editingAlias, setEditingAlias] = useState<string | null>(null);
   const peerId = chat.peer?.id;
+
+  /** Save (or with null, reset) my private nickname, then refresh the chat's title everywhere. */
+  async function saveAlias(alias: string | null) {
+    if (!peerId) return;
+    setBusy(true);
+    try {
+      const r = await api<{ alias: string | null }>(`/api/users/${peerId}/alias`, { method: "PUT", body: { alias } });
+      setProfile((p) => (p ? { ...p, alias: r.alias } : p));
+      setEditingAlias(null);
+      refetchChat(chat.id);
+      toast(r.alias ? "Nickname saved" : "Nickname removed");
+    } catch (err) {
+      toast(err instanceof ClientApiError ? err.message : "Couldn't save the nickname.", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (!open || !peerId) return;
@@ -253,9 +272,60 @@ export function ProfileSheet({
   return (
     <Sheet open={open} onClose={onClose} title="Profile">
       <div className="flex flex-col items-center gap-2 pt-1 pb-4 text-center">
-        <Avatar name={chat.title} src={p?.avatarUrl ?? chat.avatarUrl} size={96} />
-        <p className="mt-1 text-xl font-bold">{p?.displayName ?? chat.title}</p>
-        <p className="text-[15px] text-muted">@{chat.peer?.username}</p>
+        <ViewableAvatar name={chat.title} src={p?.avatarUrl ?? chat.avatarUrl} size={96} />
+        <p className="mt-1 text-xl font-bold">{p ? (p.alias ?? p.displayName) : chat.title}</p>
+        {p?.alias ? (
+          <p className="text-[14px] text-muted">
+            Original name: {p.displayName} · @{p.username}
+          </p>
+        ) : (
+          <p className="text-[15px] text-muted">@{chat.peer?.username}</p>
+        )}
+        {p &&
+          (editingAlias !== null ? (
+            <form
+              className="mt-2 flex w-full max-w-xs items-end gap-2 text-left"
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveAlias(editingAlias.trim() || null);
+              }}
+            >
+              <div className="min-w-0 flex-1">
+                <Input
+                  label="Nickname"
+                  value={editingAlias}
+                  onChange={(e) => setEditingAlias(e.target.value)}
+                  maxLength={64}
+                  placeholder={p.displayName}
+                  hint="Only you see it."
+                  autoFocus
+                />
+              </div>
+              <Button type="submit" size="sm" loading={busy} className="mb-6">
+                Save
+              </Button>
+            </form>
+          ) : (
+            <div className="mt-1 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setEditingAlias(p.alias ?? "")}
+                className="glass-1 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold"
+              >
+                <Pencil className="size-3.5" aria-hidden="true" /> {p.alias ? "Edit nickname" : "Set nickname"}
+              </button>
+              {p.alias && (
+                <button
+                  type="button"
+                  onClick={() => saveAlias(null)}
+                  disabled={busy}
+                  className="glass-1 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold text-muted"
+                >
+                  <RotateCcw className="size-3.5" aria-hidden="true" /> Reset
+                </button>
+              )}
+            </div>
+          ))}
         {p ? p.bio && <p className="max-w-xs text-[15px] whitespace-pre-wrap">{p.bio}</p> : <Skeleton className="h-4 w-40" />}
       </div>
       <div className="flex flex-col gap-2">

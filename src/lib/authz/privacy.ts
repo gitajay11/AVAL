@@ -33,6 +33,20 @@ export async function hasBlocked(blocker: string, blocked: string): Promise<bool
   return row !== null;
 }
 
+/** Who blocked whom between `sender` and `recipient`, in one query. */
+async function blockState(sender: string, recipient: string) {
+  const rows = await db.block.findMany({
+    where: {
+      OR: [
+        { blockerId: sender, blockedId: recipient },
+        { blockerId: recipient, blockedId: sender },
+      ],
+    },
+    select: { blockerId: true },
+  });
+  return { senderBlocked: rows.some((r) => r.blockerId === sender), recipientBlocked: rows.some((r) => r.blockerId === recipient) };
+}
+
 /** True if either user has blocked the other. */
 export async function isBlockedEitherWay(a: string, b: string): Promise<boolean> {
   const block = await db.block.findFirst({
@@ -90,10 +104,16 @@ export async function canSeeLastSeen(viewerId: string, owner: Pick<Owner, "id" |
  * Can `senderId` message the recipient? EVERYONE: anyone not blocked.
  * CONTACTS: only people the recipient has messaged before.
  */
-export async function canMessage(senderId: string, recipient: Pick<Owner, "id" | "messageAudience">): Promise<string | null> {
+export async function canMessage(
+  senderId: string,
+  recipient: Pick<Owner, "id" | "messageAudience">,
+  /** Block state if the caller already loaded it (saves a round trip). */
+  blocks?: { senderBlocked: boolean; recipientBlocked: boolean },
+): Promise<string | null> {
   if (senderId === recipient.id) return null;
-  if (await hasBlocked(senderId, recipient.id)) return "You blocked this person.";
-  if (await hasBlocked(recipient.id, senderId)) return "You can't message this person.";
+  const b = blocks ?? (await blockState(senderId, recipient.id));
+  if (b.senderBlocked) return "You blocked this person.";
+  if (b.recipientBlocked) return "You can't message this person.";
   const allowed = await audienceAllows(
     recipient.messageAudience === "NOBODY" ? "CONTACTS" : recipient.messageAudience,
     false,

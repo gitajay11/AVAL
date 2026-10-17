@@ -13,9 +13,9 @@
   --jade: #0b7a61;
   --ocean: #1b4e9e;
   --mint: #6ee7c8;
-  --blob-jade: 0.2;
+  --blob-jade: 0.25;
   --blob-ocean: 0.25;
-  --blob-mint: 0.15;
+  --blob-mint: 0.2;
   --grain: 0.025;
   /* Glass levels. The spec's light fills (55/65/75% white) are raised to
      65/72/80% so every text token stays AA over the brightest blob. */
@@ -28,6 +28,8 @@
   --glass-border-from: rgb(255 255 255 / 0.9);
   --glass-border-to: rgb(255 255 255 / 0.35);
   --glass-highlight: inset 0 1px 0 rgb(255 255 255 / 0.7);
+  /* Light catching the top edge of glass surfaces. */
+  --glass-sheen: rgb(255 255 255 / 0.45);
   --glass-shadow: 0 8px 32px rgb(7 20 26 / 0.12);
   --scrim: rgb(7 20 26 / 0.4);
   --input-border: rgb(11 27 43 / 0.16);
@@ -77,6 +79,7 @@
     --glass-border-from: rgb(255 255 255 / 0.18);
     --glass-border-to: rgb(255 255 255 / 0.04);
     --glass-highlight: inset 0 1px 0 rgb(255 255 255 / 0.12);
+    --glass-sheen: rgb(255 255 255 / 0.07);
     --glass-shadow: 0 8px 32px rgb(7 20 26 / 0.35);
     --scrim: rgb(7 20 26 / 0.4);
     --input-border: rgb(255 255 255 / 0.14);
@@ -123,6 +126,7 @@
   --glass-border-from: rgb(255 255 255 / 0.18);
   --glass-border-to: rgb(255 255 255 / 0.04);
   --glass-highlight: inset 0 1px 0 rgb(255 255 255 / 0.12);
+  --glass-sheen: rgb(255 255 255 / 0.07);
   --glass-shadow: 0 8px 32px rgb(7 20 26 / 0.35);
   --scrim: rgb(7 20 26 / 0.4);
   --input-border: rgb(255 255 255 / 0.14);
@@ -259,6 +263,12 @@
   .glass-1 {
     background-color: var(--glass-1);
   }
+  /* A soft sheen across the top of fixed glass (over the fill; text sits below it). */
+  .glass-2,
+  .glass,
+  .glass-3 {
+    background-image: linear-gradient(180deg, var(--glass-sheen), transparent 55%);
+  }
   .glass-2,
   .glass {
     background-color: var(--glass-2);
@@ -375,6 +385,45 @@
   }
 }
 
+/* Floating header bars (components/ui/floating-bar.tsx): shrink a little once
+   content scrolls under them. Transform only, so it stays on the compositor. */
+.floating-bar {
+  transform-origin: 50% 0;
+  transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.floating-bar[data-compact] {
+  transform: translateY(-2px) scale(0.985);
+}
+.floating-bar .floating-title {
+  transform-origin: 0 50%;
+  transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.floating-bar[data-compact] .floating-title {
+  transform: scale(0.92);
+}
+
+/* Messages soften as they slide under the floating chat header. */
+.chat-fade {
+  mask-image: linear-gradient(to bottom, transparent calc(env(safe-area-inset-top) + 20px), #000 calc(env(safe-area-inset-top) + 76px));
+}
+
+/* Avatar crop (components/ui/image-cropper.tsx): darken the corners outside the squircle mask. */
+.cropper-squircle .reactEasyCrop_CropArea {
+  border: 0;
+}
+.cropper-squircle .reactEasyCrop_CropArea::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath fill-rule='evenodd' fill='rgba(0,0,0,0.5)' d='M0 0H100V100H0Z M50 0C88 0 100 12 100 50s-12 50-50 50S0 88 0 50 12 0 50 0z'/%3E%3Cpath fill='none' stroke='rgba(255,255,255,0.7)' stroke-width='0.6' d='M50 0.3C87.8 0.3 99.7 12.2 99.7 50S87.8 99.7 50 99.7 0.3 87.8 0.3 50 12.2 0.3 50 0.3z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+}
+
+/* Squircle (superellipse) avatars. */
+.squircle {
+  border-radius: 0;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 0C88 0 100 12 100 50s-12 50-50 50S0 88 0 50 12 0 50 0z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+}
+
 /* Older browsers without backdrop-filter: solid surfaces instead of see-through ones. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .glass-2,
@@ -485,5 +534,9 @@
   }
   .glass-sheen::after {
     display: none;
+  }
+  .floating-bar,
+  .floating-bar .floating-title {
+    transition: none;
   }
 }

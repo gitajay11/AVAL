@@ -5,12 +5,6 @@ import { THEME_COOKIE } from "@/lib/auth/cookie";
 
 export type ThemePref = "system" | "light" | "dark";
 
-/**
- * Runs before first paint (inlined in <head>): resolves the saved preference
- * (a UI-only cookie) or the OS setting into data-theme, so there's no flash.
- */
-export const themeScript = `(function(){try{var m=document.cookie.match(/(?:^|; )${THEME_COOKIE}=(light|dark|system)/);var p=m?m[1]:"system";var d=p==="dark"||(p==="system"&&matchMedia("(prefers-color-scheme: dark)").matches);var r=document.documentElement;r.dataset.theme=d?"dark":"light";r.dataset.themePref=p;}catch(e){}})();`;
-
 const listeners = new Set<() => void>();
 
 function apply(pref: ThemePref) {

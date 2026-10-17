@@ -1,13 +1,11 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { VirtuosoHandle } from "react-virtuoso";
 import { ChevronDown, Copy, Eye, Flag, Forward, Lock, Pencil, Pin, PinOff, Reply, Star, StarOff, Trash2 } from "lucide-react";
 import { PublicContactSheet } from "@/components/contacts/public-contact-sheet";
-import { ChatSearch } from "./chat-search";
-import { GroupInfoSheet } from "./group-info";
 import { useUser } from "@/components/app/user-context";
 import { useRealtime, useRealtimeEvent } from "@/components/realtime/realtime-provider";
 import { ActionMenu, type MenuItem } from "@/components/ui/action-menu";
@@ -17,7 +15,7 @@ import { api, ClientApiError } from "@/lib/client/api";
 import { uploadMedia, type PreparedMedia } from "@/lib/client/media-upload";
 import { scrollBehavior } from "@/lib/client/motion";
 import { encodeCursor } from "@/lib/chats/cursor";
-import { buildTimeline, messageKey, upsertSorted, type TimelineItem, type UiMessage } from "@/lib/chats/timeline";
+import { buildTimeline, messageKey, upsertSorted, type UiMessage } from "@/lib/chats/timeline";
 import type { AttachmentDTO, ChatDetailDTO, MemberDTO, MessageDTO, MessagePage, MessageWindow, ReactionDTO, ReceiptDTO } from "@/lib/chats/types";
 import type { PublicContactDTO } from "@/lib/contacts/types";
 import { EDIT_WINDOW_MS } from "@/lib/validation/limits";
@@ -27,9 +25,13 @@ import { useChats } from "./chat-store";
 import { Composer, type ComposerSubmit } from "./composer";
 import { DeleteDialog, ForwardSheet, ProfileSheet, ReportSheet, type ReportTarget } from "./dialogs";
 import type { Receipt } from "./message-bubble";
-import { MessageList } from "./message-list";
+import { MessageList, type MessageListHandle } from "./message-list";
 
-const FIRST_INDEX = 1_000_000;
+// Split out of the chat screen's bundle: fetched once the screen is up.
+const ChatSearch = dynamic(() => import("./chat-search").then((m) => m.ChatSearch), { ssr: false });
+const GroupInfoSheet = dynamic(() => import("./group-info").then((m) => m.GroupInfoSheet), { ssr: false });
+const ReactionsSheet = dynamic(() => import("./reactions-sheet").then((m) => m.ReactionsSheet), { ssr: false });
+
 const POLL_MS = 3_000;
 const PINNED_BAR = 44;
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏", "🔥"];
@@ -43,12 +45,19 @@ type State = {
    * message): newer messages load as you scroll down, and live ones wait.
    */
   newerCursor: string | null;
-  firstItemIndex: number;
   loadingOlder: boolean;
   loadingNewer: boolean;
 };
 
-type Job = { text: string; media: PreparedMedia | null; replyToId?: string; attachmentId?: string };
+type Job = {
+  text: string;
+  media: PreparedMedia | null;
+  replyToId?: string;
+  attachmentId?: string;
+  /** Items picked together upload in parallel but are sent in order: wait for the one before. */
+  after?: Promise<void>;
+  done?: Promise<void>;
+};
 
 const sent = (m: MessageDTO): UiMessage => ({ ...m, status: "sent" });
 
@@ -60,10 +69,6 @@ function applyReaction(list: ReactionDTO[], userId: string, emoji: string | null
   return existing
     ? without.map((r) => (r.emoji === emoji ? { ...r, userIds: [...r.userIds, userId] } : r))
     : [...without, { emoji, userIds: [userId] }];
-}
-
-function firstMessageIndex(items: TimelineItem[], key: string): number {
-  return items.findIndex((i) => i.key === key);
 }
 
 export function ChatView({ detail }: { detail: ChatDetailDTO }) {
@@ -86,7 +91,6 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
     pending: [],
     olderCursor: detail.page.olderCursor,
     newerCursor: null,
-    firstItemIndex: FIRST_INDEX,
     loadingOlder: false,
     loadingNewer: false,
   }));
@@ -107,6 +111,7 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [reactionsOf, setReactionsOf] = useState<string | null>(null);
   const [groupOpen, setGroupOpen] = useState(false);
   const isGroup = chat.type === "GROUP";
   const [members, setMembers] = useState<MemberDTO[]>(detail.members ?? []);
@@ -128,7 +133,7 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
     return { key: 0, initialIndex: unread !== -1 ? unread : Math.max(0, items.length - 1) };
   });
 
-  const list = useRef<VirtuosoHandle>(null);
+  const list = useRef<MessageListHandle>(null);
   const [atBottom, setAtBottom] = useState(true);
   const atBottomRef = useRef(true);
   const [newWhileAway, setNewWhileAway] = useState(0);
@@ -249,6 +254,19 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
     });
   }, [catchUp, leave]);
 
+  // Opened from the browser's prefetch cache (up to ~30 s old): fetch what's
+  // newer, and re-read the latest page so edits, deletions and reactions made
+  // meanwhile show too. A fresh server render skips this.
+  useEffect(() => {
+    if (Date.now() - Date.parse(detail.generatedAt) < 2000) return;
+    safeCatchUp();
+    api<MessagePage>(`/api/chats/${chatId}/messages`)
+      .then((page) => page.messages.forEach(receive))
+      .catch(() => {});
+    // Once per mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useRealtimeEvent((e) => {
     switch (e.name) {
       case "message.new":
@@ -307,17 +325,14 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
     try {
       const page = await api<MessagePage>(`/api/chats/${chatId}/messages?before=${cur.olderCursor}`);
       setS((x) => {
-        const anchor = x.confirmed[0] ? messageKey(x.confirmed[0]) : null;
+        // The list keeps the viewport in place itself (it anchors on the first visible row).
         const confirmed = page.messages.map(sent).reduce(upsertSorted, x.confirmed);
-        // Shift firstItemIndex by the rows added above the old first message,
-        // so the viewport stays exactly where it was.
-        const added = anchor ? firstMessageIndex(build(confirmed, x.pending), anchor) - firstMessageIndex(build(x.confirmed, x.pending), anchor) : 0;
-        return { ...x, confirmed, olderCursor: page.olderCursor, loadingOlder: false, firstItemIndex: x.firstItemIndex - added };
+        return { ...x, confirmed, olderCursor: page.olderCursor, loadingOlder: false };
       });
     } catch {
       setS((x) => ({ ...x, loadingOlder: false }));
     }
-  }, [build, chatId]);
+  }, [chatId]);
 
   /** Replace what's shown with a window of history, re-mounting the list at `targetId`. */
   const showWindow = useCallback(
@@ -331,7 +346,6 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
         pending: win.newerCursor === null ? x.pending : [],
         olderCursor: win.olderCursor,
         newerCursor: win.newerCursor,
-        firstItemIndex: FIRST_INDEX,
         loadingOlder: false,
         loadingNewer: false,
       }));
@@ -378,6 +392,8 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
         if (job.media && !job.attachmentId) {
           job.attachmentId = await uploadMedia(chatId, job.media, (p) => setPendingState(clientId, { upload: p }));
         }
+        if (job.after) await job.after;
+        job.after = undefined; // a retry doesn't wait again
         const { message } = await api<{ message: MessageDTO }>(`/api/chats/${chatId}/messages`, {
           body: { clientId, text: job.text, attachmentId: job.attachmentId, replyToId: job.replyToId },
         });
@@ -397,51 +413,63 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
     async ({ text, media }: ComposerSubmit) => {
       // Sending from an older window first returns to the latest messages.
       if (stateRef.current.newerCursor !== null) await returnToLatest();
-      const clientId = crypto.randomUUID().replace(/-/g, "");
-      const local: AttachmentDTO[] = media
-        ? [
-            {
-              id: `local-${clientId}`,
-              kind: media.kind,
-              mimeType: media.contentType,
-              sizeBytes: media.blob.size,
-              fileName: media.fileName,
-              width: media.width ?? null,
-              height: media.height ?? null,
-              durationMs: media.durationMs ?? null,
-              waveform: media.waveform ?? null,
-              url: URL.createObjectURL(media.blob),
-            },
-          ]
-        : [];
-      const m: UiMessage = {
-        id: `pending-${clientId}`,
-        chatId,
-        senderId: me.id,
-        clientId,
-        type: media ? media.kind : "TEXT",
-        text: text || null,
-        createdAt: new Date().toISOString(),
-        editedAt: null,
-        deleted: false,
-        attachments: local,
-        replyTo: replyTo ? { id: replyTo.id, senderId: replyTo.senderId, type: replyTo.type, text: replyTo.text?.slice(0, 140) ?? null, deleted: false } : null,
-        forwardedFromName: null,
-        linkPreview: null,
-        reactions: [],
-        pinnedAt: null,
-        starred: false,
-        status: "sending",
-        ...(media ? { upload: 0 } : {}),
-      };
-      jobs.current.set(clientId, { text, media, replyToId: replyTo?.id });
-      // Local previews are released once the server copy has had time to load.
-      if (local[0]) setTimeout(() => URL.revokeObjectURL(local[0].url), 60_000);
+      // One message per attachment (the caption and the reply go with the first), or one text message.
+      const parts: (PreparedMedia | null)[] = media.length ? media : [null];
+      let previous: Promise<void> | undefined;
+      const added: UiMessage[] = [];
+      parts.forEach((item, i) => {
+        const clientId = crypto.randomUUID().replace(/-/g, "");
+        const caption = i === 0 ? text : "";
+        const reply = i === 0 ? replyTo : null;
+        const local: AttachmentDTO[] = item
+          ? [
+              {
+                id: `local-${clientId}`,
+                kind: item.kind,
+                mimeType: item.contentType,
+                sizeBytes: item.blob.size,
+                fileName: item.fileName,
+                width: item.width ?? null,
+                height: item.height ?? null,
+                durationMs: item.durationMs ?? null,
+                waveform: item.waveform ?? null,
+                url: URL.createObjectURL(item.blob),
+              },
+            ]
+          : [];
+        added.push({
+          id: `pending-${clientId}`,
+          chatId,
+          senderId: me.id,
+          clientId,
+          type: item ? item.kind : "TEXT",
+          text: caption || null,
+          createdAt: new Date(Date.now() + i).toISOString(),
+          editedAt: null,
+          deleted: false,
+          attachments: local,
+          replyTo: reply ? { id: reply.id, senderId: reply.senderId, type: reply.type, text: reply.text?.slice(0, 140) ?? null, deleted: false } : null,
+          forwardedFromName: null,
+          linkPreview: null,
+          reactions: [],
+          pinnedAt: null,
+          starred: false,
+          status: "sending",
+          ...(item ? { upload: 0 } : {}),
+        });
+        const job: Job = { text: caption, media: item, replyToId: reply?.id, after: previous };
+        jobs.current.set(clientId, job);
+        // Local previews are released once the server copy has had time to load.
+        if (local[0]) setTimeout(() => URL.revokeObjectURL(local[0].url), 60_000);
+        job.done = new Promise<void>((resolve) => {
+          queueMicrotask(() => post(clientId).finally(resolve));
+        });
+        previous = job.done;
+      });
       setReplyTo(null);
-      markFresh(messageKey(m));
-      setS((x) => ({ ...x, pending: [...x.pending, m] }));
+      for (const m of added) markFresh(messageKey(m));
+      setS((x) => ({ ...x, pending: [...x.pending, ...added] }));
       scrollToBottom();
-      post(clientId);
     },
     [chatId, me.id, post, replyTo, returnToLatest, scrollToBottom],
   );
@@ -519,10 +547,10 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
   const nameOf = useCallback(
     (userId: string | null) => {
       if (userId === me.id) return "You";
-      if (userId && userId === chat.peer?.id) return chat.peer.displayName;
+      if (userId && userId === chat.peer?.id) return chat.title; // my nickname for them, if I set one
       return members.find((m) => m.id === userId)?.displayName ?? "Former member";
     },
-    [chat.peer, me.id, members],
+    [chat.peer, chat.title, me.id, members],
   );
   const avatarOf = useCallback((userId: string | null) => members.find((m) => m.id === userId)?.avatarUrl ?? null, [members]);
 
@@ -538,6 +566,7 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
       reply: (m) => canSend && setReplyTo(m),
       openMenu: (m, point) => !readOnly && setMenu({ message: m, point, openedAt: Date.now() }),
       toggleReaction: (m, emoji) => !readOnly && toggleReaction(m, emoji),
+      showReactions: (m) => setReactionsOf(m.id),
       jumpTo,
     }),
     [avatarOf, canSend, isGroup, jumpTo, me.id, nameOf, readOnly, retry, toggleReaction],
@@ -720,7 +749,6 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
           key={view.key}
           ref={list}
           items={items}
-          firstItemIndex={s.firstItemIndex}
           initialIndex={view.initialIndex}
           meId={me.id}
           loadingOlder={s.loadingOlder}
@@ -804,6 +832,15 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
           }
         />
         <ReportSheet target={reporting} onClose={() => setReporting(null)} />
+        <ReactionsSheet
+          message={reactionsOf ? (s.confirmed.find((m) => m.id === reactionsOf) ?? null) : null}
+          meId={me.id}
+          readOnly={readOnly}
+          nameOf={nameOf}
+          avatarOf={avatarOf}
+          onToggle={toggleReaction}
+          onClose={() => setReactionsOf(null)}
+        />
         <PublicContactSheet contact={contactCard} onClose={() => setContactCard(null)} onChange={setContactCard} />
         <ChatSearch open={searchOpen} chatId={chatId} nameOf={nameOf} onClose={() => setSearchOpen(false)} onPick={(id) => {
           setSearchOpen(false);

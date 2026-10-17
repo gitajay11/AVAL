@@ -5,6 +5,7 @@ import { canMessage } from "@/lib/authz/privacy";
 import { broadcast } from "@/lib/chats/broadcast";
 import { getMessage } from "@/lib/chats/queries";
 import type { MemberDTO } from "@/lib/chats/types";
+import { aliasMap } from "@/lib/aliases";
 import { db } from "@/lib/db";
 import { deleteAttachments } from "@/lib/media/storage";
 import { deleteObject } from "@/lib/object-storage";
@@ -211,10 +212,14 @@ export async function listMembers(viewerId: string, chatId: string): Promise<Mem
     select: { blockerId: true, blockedId: true },
   });
   const blocked = new Set(blocks.map((b) => (b.blockerId === viewerId ? b.blockedId : b.blockerId)));
+  const aliases = await aliasMap(
+    viewerId,
+    rows.map((r) => r.user.id),
+  );
   return rows.map(({ role, user: u }) => {
     const photo =
       u.id === viewerId ||
       (!blocked.has(u.id) && (u.avatarAudience === "EVERYONE" || (u.avatarAudience === "CONTACTS" && posted.has(u.id))));
-    return { id: u.id, username: u.username, displayName: u.displayName, avatarUrl: photo ? avatarUrl(u.id, u.avatarKey) : null, role };
+    return { id: u.id, username: u.username, displayName: aliases.get(u.id) ?? u.displayName, avatarUrl: photo ? avatarUrl(u.id, u.avatarKey) : null, role };
   });
 }

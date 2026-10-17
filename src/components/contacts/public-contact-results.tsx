@@ -1,14 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BookUser } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { api } from "@/lib/client/api";
 import type { PublicContactDTO } from "@/lib/contacts/types";
 import { PublicContactSheet } from "./public-contact-sheet";
 
-/** Public contacts matching `query` (2+ chars, name prefix). Tap one to request access. */
+/**
+ * Public contacts matching `query` (2+ chars): name or @username prefix, and
+ * "@…" matches @usernames only. Tap one to request access.
+ */
 export function PublicContactResults({ query, heading }: { query: string; heading?: string }) {
-  const q = query.trim().replace(/^@/, "").toLowerCase();
+  const q = query.trim().toLowerCase();
   const [results, setResults] = useState<{ q: string; items: PublicContactDTO[] } | null>(null);
   const [open, setOpen] = useState<PublicContactDTO | null>(null);
 
@@ -31,21 +35,26 @@ export function PublicContactResults({ query, heading }: { query: string; headin
 
   return (
     <section aria-label="Public contacts">
-      {heading && <h3 className="px-5 pt-3 pb-1.5 text-xs font-bold tracking-wide text-muted uppercase">{heading}</h3>}
-      <ul className="flex flex-col gap-0.5">
+      {heading && <h3 className="px-5 pt-3 pb-1.5 text-xs font-bold tracking-wide text-fg/80 uppercase">{heading}</h3>}
+      <ul className="flex flex-col gap-1.5">
         {items.length === 0 && <li className="px-2 py-3 text-sm text-muted">No public contacts match.</li>}
         {items.map((c) => (
           <li key={c.id}>
             <button
               type="button"
               onClick={() => setOpen(c)}
-              className="mx-2 flex w-[calc(100%-1rem)] items-center gap-3 rounded-2xl px-2.5 py-2 text-left hover:bg-surface-2"
+              className="glass-1 glass-sheen mx-2 flex w-[calc(100%-1rem)] items-center gap-3 rounded-2xl px-2.5 py-2 text-left transition-transform active:scale-[0.97]"
             >
               <Avatar name={c.name} src={c.avatarUrl} size={44} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[15px] font-semibold">{c.name}</span>
                 <span className="block truncate text-[13px] text-muted">
-                  {c.request === "approved" ? "Shared with you" : c.request === "pending" ? "Request sent" : "Public contact"}
+                  @{c.username}
+                  {c.request === "approved" ? " · Shared with you" : c.request === "pending" ? " · Request sent" : ""}
+                </span>
+                <span className="glass-flat mt-1 inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold text-muted">
+                  <BookUser className="size-3 shrink-0" aria-hidden="true" />
+                  <span className="truncate">Personal contact · by @{c.ownerUsername}</span>
                 </span>
               </span>
             </button>

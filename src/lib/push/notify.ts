@@ -45,16 +45,22 @@ export async function pushNewMessage(message: MessageDTO) {
     blocked = new Set(rows.map((b) => (b.blockerId === message.senderId ? b.blockedId : b.blockerId)));
   }
 
+  const aliases = await db.contactAlias.findMany({
+    where: { targetUserId: message.senderId, ownerId: { in: recipients.map((r) => r.user.id) } },
+    select: { ownerId: true, alias: true },
+  });
+  const nameFor = new Map(aliases.map((a) => [a.ownerId, a.alias]));
   const preview = snippetOf(message) || "New message";
   await Promise.all(
     recipients
       .filter((r) => !blocked.has(r.user.id))
       .map((r) => {
         const body = r.user.notifyPreviews ? preview : "New message";
+        const senderName = nameFor.get(r.user.id) ?? sender.displayName;
         return pushToUser(r.user.id, {
           kind: "message",
-          title: chat.type === "GROUP" ? (chat.title ?? "Group") : sender.displayName,
-          body: chat.type === "GROUP" && r.user.notifyPreviews ? `${sender.displayName}: ${body}` : body,
+          title: chat.type === "GROUP" ? (chat.title ?? "Group") : senderName,
+          body: chat.type === "GROUP" && r.user.notifyPreviews ? `${senderName}: ${body}` : body,
           tag: `chat-${message.chatId}`,
           url: `/chats/${message.chatId}`,
           chatId: message.chatId,

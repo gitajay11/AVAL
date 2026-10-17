@@ -116,7 +116,7 @@ export function VoicePlayer({ a, mine }: { a: AttachmentDTO; mine: boolean }) {
         </div>
         <div className={cn("mt-0.5 flex items-center justify-between text-[11px]", mine ? "text-white/75" : "text-subtle")}>
           <span>{clock(progress > 0 ? progress * total : total)}</span>
-          <button type="button" onClick={cycleRate} className="rounded px-1 font-semibold" aria-label="Playback speed">
+          <button type="button" onClick={cycleRate} className="-my-1 grid h-6 min-w-8 place-items-center rounded-md px-1.5 font-semibold" aria-label={`${rate}× playback speed`}>
             {rate}×
           </button>
         </div>

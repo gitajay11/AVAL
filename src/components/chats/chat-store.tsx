@@ -104,6 +104,16 @@ type Ctx = {
 
 const ChatsContext = createContext<Ctx | null>(null);
 
+type Commands = Pick<Ctx, "updateSettings" | "markRead">;
+const CommandsContext = createContext<Commands | null>(null);
+
+/** Just the actions (stable across list updates): for rows that shouldn't re-render with the list. */
+export function useChatCommands(): Commands {
+  const ctx = useContext(CommandsContext);
+  if (!ctx) throw new Error("useChatCommands must be used inside ChatsProvider");
+  return ctx;
+}
+
 export function useChats(): Ctx {
   const ctx = useContext(ChatsContext);
   if (!ctx) throw new Error("useChats must be used inside ChatsProvider");
@@ -164,6 +174,14 @@ export function ChatsProvider({
       deliveredTimer.current = null;
       api("/api/chats/delivered", { method: "POST" }).catch(() => {});
     }, DELIVERED_DEBOUNCE_MS);
+  }, []);
+
+  // Unread messages that came with the page reached this device too. (Done
+  // from here, not the layout, so prefetching a page never marks anything.)
+  useEffect(() => {
+    if (initialChats.some((c) => c.unread > 0)) ackDelivered();
+    // Once per app load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const applyMessage = useCallback(
@@ -282,5 +300,11 @@ export function ChatsProvider({
     [state.chats, activeChatId, applyMessage, upsertChat, markRead, updateSettings, refetchChat, typing],
   );
 
-  return <ChatsContext value={value}>{children}</ChatsContext>;
+  const commands = useMemo<Commands>(() => ({ updateSettings, markRead }), [updateSettings, markRead]);
+
+  return (
+    <CommandsContext value={commands}>
+      <ChatsContext value={value}>{children}</ChatsContext>
+    </CommandsContext>
+  );
 }

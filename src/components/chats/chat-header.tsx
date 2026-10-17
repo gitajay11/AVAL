@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronLeft, Eye, Globe, Lock, Pin, Search, X } from "lucide-react";
+import { useState } from "react";
+import { Bell, BellOff, ChevronLeft, Eye, Globe, Info, Lock, MoreHorizontal, Pin, Search, X } from "lucide-react";
+import { ActionMenu } from "@/components/ui/action-menu";
 import { Avatar } from "@/components/ui/avatar";
 import { formatLastSeen, useMinute } from "@/lib/client/time";
 import type { ChatListItemDTO, MessageDTO } from "@/lib/chats/types";
-import { useTyping } from "./chat-store";
+import { useChats, useTyping } from "./chat-store";
 import { snippetOf } from "./message-snippet";
 import { TypingDots } from "./typing-dots";
 import { usePresence } from "./use-presence";
@@ -95,13 +97,22 @@ type HeaderProps = {
   onUnpin: () => void;
 };
 
+/**
+ * Floating glass capsule over the messages (they scroll underneath it): back,
+ * squircle avatar, name and status, search and a "⋯" menu. The pinned message
+ * folds out of the same capsule.
+ */
 export function ChatHeader({ chat, readOnly, nameOf, onSearch, pinned, onOpenProfile, onJumpToPinned, onUnpin }: HeaderProps) {
+  const { updateSettings } = useChats();
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const infoLabel = chat.type === "GROUP" ? "Group info" : chat.contact ? (readOnly ? "About" : "Manage contact") : "View profile";
+
   return (
-    <header className="glass-2 absolute inset-x-0 top-0 z-20 pt-[env(safe-area-inset-top)]">
-      <div className="flex h-16 items-center gap-2 px-2 sm:px-4">
+    <header className="glass-2 absolute inset-x-2 top-[max(0.5rem,env(safe-area-inset-top))] z-20 overflow-hidden rounded-[24px] sm:inset-x-3">
+      <div className="flex h-16 items-center gap-1 px-1.5 sm:px-2.5">
         <Link
           href="/chats"
-          className="grid size-10 shrink-0 place-items-center rounded-xl text-fg hover:bg-surface-3 md:hidden"
+          className="grid size-10 shrink-0 place-items-center rounded-2xl text-fg hover:bg-surface-3 md:hidden"
           aria-label="Back to chats"
         >
           <ChevronLeft className="size-6" />
@@ -109,12 +120,15 @@ export function ChatHeader({ chat, readOnly, nameOf, onSearch, pinned, onOpenPro
         <button
           type="button"
           onClick={onOpenProfile}
-          className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl py-1 pr-2 text-left hover:bg-surface-3/60"
-          aria-label={chat.type === "GROUP" ? `${chat.title} info` : chat.contact ? (readOnly ? `About ${chat.title}` : `Manage ${chat.title}`) : `Open ${chat.title}'s profile`}
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl py-1 pr-2 pl-1 text-left hover:bg-surface-3/60"
         >
-          <Avatar name={chat.title} src={chat.avatarUrl} size={42} />
+          <span className="sr-only">{chat.type === "GROUP" ? "Group info: " : chat.contact ? (readOnly ? "About: " : "Manage contact: ") : "Profile: "}</span>
+          <Avatar name={chat.title} src={chat.avatarUrl} size={42} shape="squircle" />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[16px] leading-tight font-bold">{chat.title}</span>
+            <span className="flex items-center gap-1.5">
+              <span className="truncate text-[16px] leading-tight font-bold">{chat.title}</span>
+              {chat.muted && <BellOff className="size-3.5 shrink-0 text-subtle" aria-label="Muted" />}
+            </span>
             {chat.type === "GROUP" ? (
               <GroupLine chat={chat} nameOf={nameOf} />
             ) : chat.contact ? (
@@ -127,12 +141,38 @@ export function ChatHeader({ chat, readOnly, nameOf, onSearch, pinned, onOpenPro
         <button
           type="button"
           onClick={onSearch}
-          className="grid size-10 shrink-0 place-items-center rounded-xl text-muted hover:bg-surface-3 hover:text-fg"
+          className="grid size-10 shrink-0 place-items-center rounded-2xl text-muted hover:bg-surface-3 hover:text-fg"
           aria-label="Search in this chat"
         >
           <Search className="size-5" />
         </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setMenu({ x: r.right - 200, y: r.bottom + 6 });
+          }}
+          className="grid size-10 shrink-0 place-items-center rounded-2xl text-muted hover:bg-surface-3 hover:text-fg"
+          aria-label="More"
+          aria-haspopup="menu"
+        >
+          <MoreHorizontal className="size-5" />
+        </button>
       </div>
+      <ActionMenu
+        anchor={menu}
+        onClose={() => setMenu(null)}
+        label="Chat"
+        items={[
+          { label: "Search", icon: Search, onSelect: onSearch },
+          {
+            label: chat.muted ? "Unmute" : "Mute",
+            icon: chat.muted ? Bell : BellOff,
+            onSelect: () => updateSettings(chat.id, { mute: chat.muted ? "off" : "forever" }),
+          },
+          { label: infoLabel, icon: Info, onSelect: onOpenProfile },
+        ]}
+      />
       <AnimatePresence initial={false}>
         {pinned && (
           <motion.div
@@ -141,7 +181,7 @@ export function ChatHeader({ chat, readOnly, nameOf, onSearch, pinned, onOpenPro
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden border-t border-line"
           >
-            <div className="flex h-11 items-center gap-2 px-3 sm:px-5">
+            <div className="flex h-11 items-center gap-2 px-3 sm:px-4">
               <button type="button" onClick={onJumpToPinned} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
                 <span className="h-7 w-[3px] shrink-0 rounded-full bg-accent" aria-hidden="true" />
                 <span className="min-w-0">
@@ -164,5 +204,8 @@ export function ChatHeader({ chat, readOnly, nameOf, onSearch, pinned, onOpenPro
   );
 }
 
-/** Height of the header content (without the safe area), used to pad the list. */
-export const CHAT_HEADER_HEIGHT = 64;
+/**
+ * Space the floating header takes above the first message (without the safe
+ * area): 8px inset + the 64px capsule + a 4px gap.
+ */
+export const CHAT_HEADER_HEIGHT = 76;

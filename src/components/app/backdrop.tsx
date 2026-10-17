@@ -13,11 +13,13 @@ import { useEffect, useRef } from "react";
 
 type Blob = { color: string; opacity: string; style: React.CSSProperties };
 
+// Centres inside the viewport, so colour shows behind the list, the chat and the
+// headers (not just in the corners).
 const BLOBS: Blob[] = [
-  { color: "var(--jade)", opacity: "var(--blob-jade)", style: { top: "-25vmax", left: "-20vmax" } },
-  { color: "var(--ocean)", opacity: "var(--blob-ocean)", style: { top: "-15vmax", right: "-25vmax" } },
-  { color: "var(--mint)", opacity: "var(--blob-mint)", style: { bottom: "-30vmax", left: "10vw" } },
-  { color: "var(--ocean)", opacity: "var(--blob-jade)", style: { bottom: "-20vmax", right: "-15vmax" } },
+  { color: "var(--jade)", opacity: "var(--blob-jade)", style: { top: "-18vmax", left: "-22vmax" } },
+  { color: "var(--ocean)", opacity: "var(--blob-ocean)", style: { top: "10vh", right: "-30vmax" } },
+  { color: "var(--mint)", opacity: "var(--blob-mint)", style: { bottom: "-28vmax", left: "5vw" } },
+  { color: "var(--jade)", opacity: "var(--blob-mint)", style: { top: "35vh", left: "-35vmax" } },
 ];
 
 const RESUME_AFTER_MS = 300;

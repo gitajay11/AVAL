@@ -2,8 +2,11 @@
 // stored on the client. Tables and columns are snake_case in the database.
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  // Nested selects load in one query (LATERAL JOIN) instead of one round trip
+  // per relation: fewer sequential trips to Neon on every request.
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
@@ -120,26 +123,29 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  sessions            Session[]
-  emailTokens         EmailToken[]
-  memberships         ChatMember[]
-  createdChats        Chat[]                @relation("ChatCreator")
-  messages            Message[]             @relation("MessageSender")
-  pinnedMessages      Message[]             @relation("MessagePinner")
-  attachments         Attachment[]
-  reactions           Reaction[]
-  receipts            Receipt[]
-  hiddenMessages      HiddenMessage[]
-  starredMessages     StarredMessage[]
-  personalContacts    PersonalContact[]
-  accessRequests      ContactAccessRequest[]
-  accessGrants        ContactAccessGrant[]
-  blocksMade          Block[]               @relation("Blocker")
-  blocksReceived      Block[]               @relation("Blocked")
-  reportsMade         Report[]              @relation("Reporter")
-  reportsReceived     Report[]              @relation("ReportedUser")
-  pushSubscriptions   PushSubscription[]
-  notifications       Notification[]
+  sessions          Session[]
+  emailTokens       EmailToken[]
+  memberships       ChatMember[]
+  createdChats      Chat[]                 @relation("ChatCreator")
+  messages          Message[]              @relation("MessageSender")
+  pinnedMessages    Message[]              @relation("MessagePinner")
+  attachments       Attachment[]
+  reactions         Reaction[]
+  receipts          Receipt[]
+  hiddenMessages    HiddenMessage[]
+  starredMessages   StarredMessage[]
+  personalContacts  PersonalContact[]
+  accessRequests    ContactAccessRequest[]
+  accessGrants      ContactAccessGrant[]
+  blocksMade        Block[]                @relation("Blocker")
+  blocksReceived    Block[]                @relation("Blocked")
+  reportsMade       Report[]               @relation("Reporter")
+  reportsReceived   Report[]               @relation("ReportedUser")
+  pushSubscriptions PushSubscription[]
+  notifications     Notification[]
+  handle            Handle?
+  aliasesMade       ContactAlias[]         @relation("AliasOwner")
+  aliasesReceived   ContactAlias[]         @relation("AliasTarget")
 
   // username_lower uses COLLATE "C" (set in the init migration), so the unique
   // btree index also serves `LIKE 'abc%'` prefix search.
@@ -226,21 +232,21 @@ model ChatMember {
 }
 
 model Message {
-  id                String      @id @default(uuid(7)) @db.Uuid
-  chatId            String      @map("chat_id") @db.Uuid
-  senderId          String?     @map("sender_id") @db.Uuid // null for SYSTEM
-  clientId          String?     @map("client_id") @db.VarChar(64) // idempotency key from the optimistic send
-  type              MessageType @default(TEXT)
-  text              String?     @db.VarChar(4096)
-  replyToId         String?     @map("reply_to_id") @db.Uuid
-  forwardedFromId   String?     @map("forwarded_from_id") @db.Uuid
-  forwardedFromName String?     @map("forwarded_from_name") @db.VarChar(64) // snapshot, survives source deletion
-  linkPreview       Json?       @map("link_preview")
-  editedAt          DateTime?   @map("edited_at")
-  deletedAt         DateTime?   @map("deleted_at") // deleted for everyone: content is wiped
-  pinnedAt          DateTime?   @map("pinned_at")
-  pinnedById        String?     @map("pinned_by_id") @db.Uuid
-  createdAt         DateTime    @default(now()) @map("created_at")
+  id                String                   @id @default(uuid(7)) @db.Uuid
+  chatId            String                   @map("chat_id") @db.Uuid
+  senderId          String?                  @map("sender_id") @db.Uuid // null for SYSTEM
+  clientId          String?                  @map("client_id") @db.VarChar(64) // idempotency key from the optimistic send
+  type              MessageType              @default(TEXT)
+  text              String?                  @db.VarChar(4096)
+  replyToId         String?                  @map("reply_to_id") @db.Uuid
+  forwardedFromId   String?                  @map("forwarded_from_id") @db.Uuid
+  forwardedFromName String?                  @map("forwarded_from_name") @db.VarChar(64) // snapshot, survives source deletion
+  linkPreview       Json?                    @map("link_preview")
+  editedAt          DateTime?                @map("edited_at")
+  deletedAt         DateTime?                @map("deleted_at") // deleted for everyone: content is wiped
+  pinnedAt          DateTime?                @map("pinned_at")
+  pinnedById        String?                  @map("pinned_by_id") @db.Uuid
+  createdAt         DateTime                 @default(now()) @map("created_at")
   // Full-text vector, kept in sync by a trigger defined in the init migration.
   searchVector      Unsupported("tsvector")? @map("search_vector")
 
@@ -352,18 +358,22 @@ model StarredMessage {
 // ───────────────────────────── Personal contacts ─────────────────────────────
 
 model PersonalContact {
-  id         String            @id @default(uuid(7)) @db.Uuid
-  ownerId    String            @map("owner_id") @db.Uuid
-  name       String            @db.VarChar(64)
-  nameLower  String            @map("name_lower") @db.VarChar(64)
-  avatarKey  String?           @map("avatar_key")
-  note       String?           @db.VarChar(500)
-  visibility ContactVisibility @default(PRIVATE)
-  createdAt  DateTime          @default(now()) @map("created_at")
-  updatedAt  DateTime          @updatedAt @map("updated_at")
+  id            String            @id @default(uuid(7)) @db.Uuid
+  ownerId       String            @map("owner_id") @db.Uuid
+  name          String            @db.VarChar(64)
+  nameLower     String            @map("name_lower") @db.VarChar(64)
+  // Required @username, in the same namespace as users' (see Handle).
+  username      String            @db.VarChar(20)
+  usernameLower String            @unique @map("username_lower") @db.VarChar(20)
+  avatarKey     String?           @map("avatar_key")
+  note          String?           @db.VarChar(500)
+  visibility    ContactVisibility @default(PRIVATE)
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
 
   owner          User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   chat           Chat?
+  handle         Handle?
   accessRequests ContactAccessRequest[]
   accessGrants   ContactAccessGrant[]
   reports        Report[]
@@ -372,6 +382,36 @@ model PersonalContact {
   // name_lower uses COLLATE "C" (init migration) so this index serves prefix search.
   @@index([visibility, nameLower])
   @@map("personal_contacts")
+}
+
+/// One namespace for @usernames: every user's and every personal contact's
+/// handle is a row here, so a name can't belong to both (the primary key
+/// enforces it, even under concurrent sign-ups and contact creation).
+model Handle {
+  handleLower String  @id @map("handle_lower") @db.VarChar(20)
+  userId      String? @unique @map("user_id") @db.Uuid
+  contactId   String? @unique @map("contact_id") @db.Uuid
+
+  user    User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contact PersonalContact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  // CHECK (exactly one of user_id / contact_id) is in the migration.
+  @@map("handles")
+}
+
+/// A private nickname I gave someone: shown instead of their name, to me only.
+model ContactAlias {
+  ownerId      String   @map("owner_id") @db.Uuid
+  targetUserId String   @map("target_user_id") @db.Uuid
+  alias        String   @db.VarChar(64)
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  owner  User @relation("AliasOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  target User @relation("AliasTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@id([ownerId, targetUserId])
+  @@index([targetUserId])
+  @@map("contact_aliases")
 }
 
 model ContactAccessRequest {

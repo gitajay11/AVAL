@@ -2,6 +2,7 @@ import { json, route } from "@/lib/api";
 import { requireSession } from "@/lib/auth/session";
 import { blockedAmong, directKey } from "@/lib/authz/privacy";
 import type { UserSearchResultDTO } from "@/lib/chats/types";
+import { aliasMap } from "@/lib/aliases";
 import { db } from "@/lib/db";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { avatarUrl } from "@/lib/users";
@@ -52,13 +53,17 @@ export const GET = route(async (req) => {
     ).map((m) => m.senderId),
   );
 
+  const aliases = await aliasMap(
+    me.id,
+    visible.map((r) => r.id),
+  );
   const results: UserSearchResultDTO[] = visible.map((r) => {
     const photoVisible =
       r.avatarAudience === "EVERYONE" || (r.avatarAudience === "CONTACTS" && contactSenders.has(r.id));
     return {
       id: r.id,
       username: r.username,
-      displayName: r.displayName,
+      displayName: aliases.get(r.id) ?? r.displayName,
       avatarUrl: photoVisible ? avatarUrl(r.id, r.avatarKey) : null,
       existingChatId: chatByKey.get(directKey(me.id, r.id)) ?? null,
     };

@@ -10,6 +10,8 @@ const contactSelect = {
   id: true,
   ownerId: true,
   name: true,
+  username: true,
+  owner: { select: { username: true } },
   note: true,
   avatarKey: true,
   visibility: true,

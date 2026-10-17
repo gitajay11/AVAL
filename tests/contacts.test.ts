@@ -42,9 +42,16 @@ describe("requestState (what a requester sees)", () => {
 
 describe("contact validation", () => {
   it("defaults to private and trims names", () => {
-    expect(CreateContactSchema.parse({ name: "  Mom  " })).toEqual({ name: "Mom", visibility: "PRIVATE" });
-    expect(CreateContactSchema.safeParse({ name: "   " }).success).toBe(false);
-    expect(CreateContactSchema.safeParse({ name: "x", visibility: "FRIENDS" }).success).toBe(false);
+    expect(CreateContactSchema.parse({ name: "  Mom  ", username: "mom_k" })).toEqual({ name: "Mom", username: "mom_k", visibility: "PRIVATE" });
+    expect(CreateContactSchema.safeParse({ name: "   ", username: "mom_k" }).success).toBe(false);
+    expect(CreateContactSchema.safeParse({ name: "x", username: "mom_k", visibility: "FRIENDS" }).success).toBe(false);
+  });
+  it("requires a valid @username, case-insensitively", () => {
+    expect(CreateContactSchema.safeParse({ name: "Mom" }).success).toBe(false);
+    expect(CreateContactSchema.parse({ name: "Mom", username: "  Mom.K " }).username).toBe("mom.k");
+    expect(CreateContactSchema.safeParse({ name: "Mom", username: "ab" }).success).toBe(false);
+    expect(CreateContactSchema.safeParse({ name: "Mom", username: "mom k" }).success).toBe(false);
+    expect(UpdateContactSchema.parse({ username: "New_Name" })).toEqual({ username: "new_name" });
   });
   it("only accepts known fields when updating", () => {
     expect(UpdateContactSchema.parse({ visibility: "PUBLIC", ownerId: "hijack" })).toEqual({ visibility: "PUBLIC" });

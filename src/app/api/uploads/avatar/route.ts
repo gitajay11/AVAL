@@ -4,7 +4,7 @@ import { requireSession } from "@/lib/auth/session";
 import { requireOwnedContact } from "@/lib/authz/contacts";
 import { requireGroupAdmin } from "@/lib/groups/service";
 import { db } from "@/lib/db";
-import { presignUpload } from "@/lib/object-storage";
+import { fullAvatarKey, presignUpload } from "@/lib/object-storage";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { AvatarUploadSchema } from "@/lib/validation/profile";
 
@@ -19,7 +19,7 @@ const EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "
 export const POST = route(async (req) => {
   const { user } = await requireSession();
   await rateLimit("avatarUpload", user.id);
-  const { contentType, size, contactId, chatId } = await parseJson(req, AvatarUploadSchema);
+  const { contentType, size, fullSize, contactId, chatId } = await parseJson(req, AvatarUploadSchema);
   if (contactId) await requireOwnedContact(user.id, contactId);
   if (chatId) await requireGroupAdmin(user.id, chatId);
 
@@ -29,6 +29,9 @@ export const POST = route(async (req) => {
     data: { uploaderId: user.id, kind: "AVATAR", objectKey, mimeType: contentType, sizeBytes: size },
     select: { id: true },
   });
-  const { url, headers } = await presignUpload(objectKey, contentType, size);
-  return json({ uploadId: upload.id, url, headers });
+  const [main, full] = await Promise.all([
+    presignUpload(objectKey, contentType, size),
+    fullSize ? presignUpload(fullAvatarKey(objectKey), contentType, fullSize) : null,
+  ]);
+  return json({ uploadId: upload.id, url: main.url, headers: main.headers, full });
 });

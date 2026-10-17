@@ -7,30 +7,13 @@ import { useState } from "react";
 import { AtSign, Check, ChevronDown, Mail, LockKeyhole, UserRound, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/field";
-import { Spinner } from "@/components/ui/spinner";
 import { api, ClientApiError } from "@/lib/client/api";
-import { useUsernameCheck, type UsernameState } from "@/lib/client/use-username-check";
+import { UsernameStatus } from "@/components/ui/username-field";
+import { useUsernameCheck } from "@/lib/client/use-username-check";
 import { USERNAME_MAX } from "@/lib/validation/limits";
 import { AuthCard, FormError } from "./auth-card";
 import { PasswordMeter } from "./password-meter";
-
-function UsernameStatus({ state }: { state: UsernameState }) {
-  switch (state.status) {
-    case "checking":
-      return (
-        <span className="inline-flex items-center gap-1.5">
-          <Spinner className="size-3.5" /> Checking…
-        </span>
-      );
-    case "available":
-      return <span className="font-semibold text-accent">✓ Available</span>;
-    case "taken":
-    case "invalid":
-      return <span className="font-medium text-danger">{state.reason}</span>;
-    default:
-      return null;
-  }
-}
+import { DateOfBirthField } from "@/components/ui/date-of-birth-field";
 
 export function SignupForm() {
   const router = useRouter();
@@ -178,15 +161,12 @@ export function SignupForm() {
             >
               <div className="flex flex-col gap-4 pb-1">
                 <Textarea label="Bio" optional value={form.bio} onChange={set("bio")} error={fields.bio} maxLength={160} rows={2} />
-                <Input
+                <DateOfBirthField
                   label="Date of birth"
                   optional
-                  type="date"
-                  autoComplete="bday"
                   value={form.dateOfBirth}
-                  onChange={set("dateOfBirth")}
+                  onChange={(dateOfBirth) => setForm((f) => ({ ...f, dateOfBirth }))}
                   error={fields.dateOfBirth}
-                  max={new Date().toISOString().slice(0, 10)}
                 />
               </div>
             </motion.div>

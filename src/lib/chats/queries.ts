@@ -27,6 +27,7 @@ type ChatRow = {
   pinned_at: Date | null;
   archived_at: Date | null;
   muted_until: Date | null;
+  muted: boolean;
   marked_unread: boolean;
   lm_id: string | null;
   lm_sender_id: string | null;
@@ -40,6 +41,7 @@ type ChatRow = {
   peer_id: string | null;
   peer_username: string | null;
   peer_display_name: string | null;
+  peer_alias: string | null;
   peer_avatar_key: string | null;
   peer_avatar_visible: boolean | null;
   peer_delivered_at: Date | null;
@@ -65,12 +67,12 @@ function chatRows(me: string, opts: { chatId?: string; limit: number }) {
   return db.$queryRaw<ChatRow[]>`
     SELECT
       c.id, c.type::text AS type, c.title, c.avatar_key, c.created_at, c.last_message_at,
-      lu.display_name AS lm_sender_name,
+      coalesce(la.alias, lu.display_name) AS lm_sender_name,
       CASE WHEN c.type = 'GROUP' THEN (SELECT count(*)::int FROM chat_members gm WHERE gm.chat_id = c.id) END AS member_count,
-      cm.pinned_at, cm.archived_at, cm.muted_until, cm.marked_unread,
+      cm.pinned_at, cm.archived_at, cm.muted_until, coalesce(cm.muted_until > now(), false) AS muted, cm.marked_unread,
       lm.id AS lm_id, lm.sender_id AS lm_sender_id, lm.type::text AS lm_type, lm.text AS lm_text,
       lm.created_at AS lm_created_at, lm.deleted_at AS lm_deleted_at,
-      p.id AS peer_id, p.username AS peer_username, p.display_name AS peer_display_name,
+      p.id AS peer_id, p.username AS peer_username, p.display_name AS peer_display_name, pa.alias AS peer_alias,
       p.avatar_key AS peer_avatar_key,
       (
         p.avatar_key IS NOT NULL
@@ -119,6 +121,9 @@ function chatRows(me: string, opts: { chatId?: string; limit: number }) {
     LEFT JOIN receipts pr ON pr.chat_id = c.id AND pr.user_id = p.id
     LEFT JOIN personal_contacts pc ON pc.id = c.contact_id
     LEFT JOIN users lu ON lu.id = lm.sender_id AND c.type = 'GROUP'
+    -- My private nicknames (contact_aliases primary key: owner, target).
+    LEFT JOIN contact_aliases pa ON pa.owner_id = ${me}::uuid AND pa.target_user_id = p.id
+    LEFT JOIN contact_aliases la ON la.owner_id = ${me}::uuid AND la.target_user_id = lu.id
     WHERE cm.user_id = ${me}::uuid ${only}
     ORDER BY cm.pinned_at DESC NULLS LAST, COALESCE(c.last_message_at, c.created_at) DESC, c.id DESC
     LIMIT ${opts.limit}
@@ -137,7 +142,7 @@ function toChatItem(r: ChatRow): ChatListItemDTO {
   return {
     id: r.id,
     type: r.type,
-    title: r.title ?? r.contact_name ?? peer?.displayName ?? "Chat",
+    title: r.title ?? r.contact_name ?? r.peer_alias ?? peer?.displayName ?? "Chat",
     avatarUrl: r.contact_id
       ? contactAvatarUrl(r.contact_id, r.contact_avatar_key)
       : r.type === "GROUP"
@@ -161,7 +166,7 @@ function toChatItem(r: ChatRow): ChatListItemDTO {
     unread: r.unread,
     pinned: r.pinned_at !== null,
     archived: r.archived_at !== null,
-    muted: r.muted_until !== null && r.muted_until > new Date(),
+    muted: r.muted, // compared in SQL: no clock read while prerendering
     markedUnread: r.marked_unread,
     peerDeliveredAt: r.peer_delivered_at?.toISOString() ?? null,
     peerReadAt: r.peer_read_at?.toISOString() ?? null,

@@ -60,7 +60,7 @@ export function PeopleResults({ query, onOpened }: { query: string; onOpened: ()
 
   return (
     <section aria-label="People">
-      <h3 className="px-5 pt-3 pb-1.5 text-xs font-bold tracking-wide text-muted uppercase">People</h3>
+      <h3 className="px-5 pt-3 pb-1.5 text-xs font-bold tracking-wide text-fg/80 uppercase">People</h3>
       {current === null ? (
         <div className="flex flex-col gap-2 px-4 py-1" aria-busy="true">
           {[0, 1].map((i) => (
@@ -83,7 +83,7 @@ export function PeopleResults({ query, onOpened }: { query: string; onOpened: ()
                 type="button"
                 onClick={() => open(p)}
                 disabled={opening !== null}
-                className="mx-2 flex w-[calc(100%-1rem)] items-center gap-3 rounded-2xl px-2.5 py-2 text-left hover:bg-surface-2 disabled:opacity-60"
+                className="glass-1 glass-sheen mx-2 mb-1.5 flex w-[calc(100%-1rem)] items-center gap-3 rounded-2xl px-2.5 py-2 text-left transition-transform active:scale-[0.97] disabled:opacity-60"
               >
                 <Avatar name={p.displayName} src={p.avatarUrl} size={44} />
                 <span className="min-w-0 flex-1">

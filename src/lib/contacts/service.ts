@@ -2,7 +2,7 @@ import "server-only";
 import { ApiError } from "@/lib/api";
 import { requireOwnedContact, requireVisibleContact, type ContactRow } from "@/lib/authz/contacts";
 import { blockedAmong } from "@/lib/authz/privacy";
-import { db } from "@/lib/db";
+import { db, uniqueViolation } from "@/lib/db";
 import { deleteAttachments } from "@/lib/media/storage";
 import { deleteObject } from "@/lib/object-storage";
 import { pushAccessEvent } from "@/lib/push/notify";
@@ -31,11 +31,12 @@ function toUser(u: { id: string; username: string; displayName: string; avatarKe
   };
 }
 
-function toMyContact(c: ContactRow, counts: { viewers: number; pending: number }): MyContactDTO {
+function toMyContact(c: Omit<ContactRow, "owner">, counts: { viewers: number; pending: number }): MyContactDTO {
   return {
     id: c.id,
     chatId: c.chat!.id,
     name: c.name,
+    username: c.username,
     note: c.note,
     avatarUrl: contactAvatarUrl(c.id, c.avatarKey),
     visibility: c.visibility,
@@ -75,6 +76,7 @@ const ownedSelect = {
   id: true,
   ownerId: true,
   name: true,
+  username: true,
   note: true,
   avatarKey: true,
   visibility: true,
@@ -88,19 +90,34 @@ export async function listMyContacts(ownerId: string): Promise<MyContactDTO[]> {
   return rows.map((r) => toMyContact(r, { viewers: r._count.accessGrants, pending: r._count.accessRequests }));
 }
 
+/** A taken @username (by a user or another contact) as a form error. */
+function usernameTaken(err: unknown): never {
+  const fields = uniqueViolation(err);
+  if (fields && fields.some((f) => f.includes("handle") || f.includes("username"))) {
+    throw new ApiError(409, "conflict", "That username is taken.", { username: "That username is taken" });
+  }
+  throw err;
+}
+
 /** A contact and its one-way chat (the owner is the chat's only member). */
-export async function createContact(ownerId: string, input: { name: string; note?: string; visibility: "PRIVATE" | "PUBLIC" }) {
-  const contact = await db.personalContact.create({
-    data: {
-      ownerId,
-      name: input.name,
-      nameLower: input.name.toLowerCase(),
-      note: input.note || null,
-      visibility: input.visibility,
-      chat: { create: { type: "CONTACT", createdById: ownerId, members: { create: { userId: ownerId, role: "OWNER" } } } },
-    },
-    select: ownedSelect,
-  });
+export async function createContact(ownerId: string, input: { name: string; username: string; note?: string; visibility: "PRIVATE" | "PUBLIC" }) {
+  const contact = await db.personalContact
+    .create({
+      data: {
+        ownerId,
+        name: input.name,
+        nameLower: input.name.toLowerCase(),
+        username: input.username,
+        usernameLower: input.username,
+        note: input.note || null,
+        visibility: input.visibility,
+        // Claims the @username in the namespace shared with users (same statement).
+        handle: { create: { handleLower: input.username } },
+        chat: { create: { type: "CONTACT", createdById: ownerId, members: { create: { userId: ownerId, role: "OWNER" } } } },
+      },
+      select: ownedSelect,
+    })
+    .catch(usernameTaken);
   return toMyContact(contact, { viewers: 0, pending: 0 });
 }
 
@@ -145,7 +162,7 @@ async function revokeAll(contact: ContactRow): Promise<string[]> {
 export async function updateContact(
   ownerId: string,
   contactId: string,
-  input: { name?: string; note?: string | null; visibility?: "PRIVATE" | "PUBLIC"; removeAvatar?: true },
+  input: { name?: string; username?: string; note?: string | null; visibility?: "PRIVATE" | "PUBLIC"; removeAvatar?: true },
 ) {
   const contact = await requireOwnedContact(ownerId, contactId);
   let revoked: string[] = [];
@@ -153,6 +170,15 @@ export async function updateContact(
     // Going private: access ends immediately, before anything else is visible.
     await db.personalContact.update({ where: { id: contactId }, data: { visibility: "PRIVATE" } });
     revoked = await revokeAll(contact);
+  }
+  if (input.username !== undefined && input.username !== contact.username.toLowerCase()) {
+    // Moves the handle and the contact's copy together, or neither.
+    await db
+      .$transaction([
+        db.handle.update({ where: { contactId }, data: { handleLower: input.username } }),
+        db.personalContact.update({ where: { id: contactId }, data: { username: input.username, usernameLower: input.username } }),
+      ])
+      .catch(usernameTaken);
   }
   await db.personalContact.update({
     where: { id: contactId },
@@ -245,6 +271,8 @@ export async function publicContact(userId: string, contactId: string): Promise<
   return {
     id: contact.id,
     name: contact.name,
+    username: contact.username,
+    ownerUsername: contact.owner.username,
     avatarUrl: contactAvatarUrl(contact.id, contact.avatarKey),
     request: role === "owner" ? "approved" : requestState(request?.status ?? null, role === "viewer"),
     chatId: role === "viewer" || role === "owner" ? contact.chat!.id : null,
@@ -287,16 +315,40 @@ export async function cancelRequest(userId: string, contactId: string) {
   return publicContact(userId, contactId);
 }
 
-/** Public contacts by name prefix: name and avatar only, never the owner. */
-export async function searchPublicContacts(userId: string, q: string): Promise<PublicContactDTO[]> {
+/**
+ * Public contacts by name or @username prefix ("@" searches usernames only).
+ * Private contacts never appear. Results say whose contact it is.
+ */
+export async function searchPublicContacts(userId: string, raw: string): Promise<PublicContactDTO[]> {
+  const byHandle = raw.startsWith("@");
+  const q = raw.replace(/^@/, "");
+  if (!q) return [];
   const rows = await db.personalContact.findMany({
-    where: { visibility: "PUBLIC", nameLower: { startsWith: q }, ownerId: { not: userId } },
+    where: {
+      visibility: "PUBLIC",
+      ownerId: { not: userId },
+      OR: byHandle ? [{ usernameLower: { startsWith: q } }] : [{ nameLower: { startsWith: q } }, { usernameLower: { startsWith: q } }],
+    },
     orderBy: { nameLower: "asc" },
     take: 30,
-    select: { id: true, ownerId: true, name: true, nameLower: true, avatarKey: true, chat: { select: { id: true } } },
+    select: {
+      id: true,
+      ownerId: true,
+      name: true,
+      nameLower: true,
+      username: true,
+      usernameLower: true,
+      avatarKey: true,
+      chat: { select: { id: true } },
+      owner: { select: { username: true } },
+    },
   });
   const blocked = await blockedAmong(userId, [...new Set(rows.map((r) => r.ownerId))]);
-  const visible = rows.filter((r) => r.nameLower.startsWith(q) && !blocked.has(r.ownerId)).slice(0, 20);
+  const visible = rows
+    .filter((r) => (r.usernameLower.startsWith(q) || (!byHandle && r.nameLower.startsWith(q))) && !blocked.has(r.ownerId))
+    // Exact @username first.
+    .sort((a, b) => Number(b.usernameLower === q) - Number(a.usernameLower === q))
+    .slice(0, 20);
   const [requests, grants] = await Promise.all([
     db.contactAccessRequest.findMany({
       where: { requesterId: userId, contactId: { in: visible.map((r) => r.id) } },
@@ -309,6 +361,8 @@ export async function searchPublicContacts(userId: string, q: string): Promise<P
   return visible.map((r) => ({
     id: r.id,
     name: r.name,
+    username: r.username,
+    ownerUsername: r.owner.username,
     avatarUrl: contactAvatarUrl(r.id, r.avatarKey),
     request: requestState(status.get(r.id) ?? null, granted.has(r.id)),
     chatId: granted.has(r.id) ? r.chat!.id : null,

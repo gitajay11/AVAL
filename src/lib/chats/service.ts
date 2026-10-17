@@ -6,6 +6,7 @@ import { chatMembers, directPeerId, getMembership, requireMessage, type Membersh
 import { chatAudience } from "@/lib/authz/contacts";
 import { canMessage, directKey, isBlockedEitherWay } from "@/lib/authz/privacy";
 import { db, uniqueViolation } from "@/lib/db";
+import { uuidv7 } from "@/lib/ids";
 import { attachLinkPreview, firstUrl } from "@/lib/link-preview";
 import { deleteAttachments } from "@/lib/media/storage";
 import { touchLastSeen } from "@/lib/presence";
@@ -25,9 +26,18 @@ export async function cantSendReason(me: Me, m: Membership): Promise<string | nu
   if (!me.emailVerified) return VERIFY_FIRST;
   const peerId = directPeerId(m, me.id);
   if (!peerId) return null;
-  const peer = await db.user.findUnique({ where: { id: peerId }, select: { id: true, messageAudience: true } });
+  // One query: the peer, plus any block between us in either direction.
+  const peer = await db.user.findUnique({
+    where: { id: peerId },
+    select: {
+      id: true,
+      messageAudience: true,
+      blocksMade: { where: { blockedId: me.id }, select: { blockerId: true }, take: 1 },
+      blocksReceived: { where: { blockerId: me.id }, select: { blockerId: true }, take: 1 },
+    },
+  });
   if (!peer) return "This account no longer exists.";
-  return canMessage(me.id, peer);
+  return canMessage(me.id, peer, { senderBlocked: peer.blocksReceived.length > 0, recipientBlocked: peer.blocksMade.length > 0 });
 }
 
 async function requireCanSend(me: Me, m: Membership) {
@@ -117,64 +127,83 @@ export async function sendMessage(
   m: Membership,
   input: { clientId: string; text: string; attachmentId?: string; replyToId?: string },
 ): Promise<MessageDTO> {
-  const dupe = await db.message.findUnique({
-    where: { senderId_clientId: { senderId: me.id, clientId: input.clientId } },
-    select: messageSelect(me.id),
-  });
+  const findDupe = () =>
+    db.message.findUnique({ where: { senderId_clientId: { senderId: me.id, clientId: input.clientId } }, select: messageSelect(me.id) });
+  // Independent checks run together (one round trip instead of four).
+  const [dupe, cantSend, a, target] = await Promise.all([
+    findDupe(),
+    cantSendReason(me, m),
+    input.attachmentId ? db.attachment.findUnique({ where: { id: input.attachmentId } }) : null,
+    input.replyToId
+      ? db.message.findFirst({ where: { id: input.replyToId, chatId: m.chat.id, type: { not: "SYSTEM" } }, select: { id: true } })
+      : null,
+  ]);
   if (dupe) {
     if (dupe.chatId !== m.chat.id) throw new ApiError(409, "client_id_reused", "Duplicate message id.");
     return toMessage(dupe); // retry of a send that already succeeded
   }
-  await requireCanSend(me, m);
+  if (cantSend) throw new ApiError(403, "not_allowed", cantSend);
 
   let type: MessageType = "TEXT";
   if (input.attachmentId) {
-    const a = await db.attachment.findUnique({ where: { id: input.attachmentId } });
     // Must be my own confirmed upload, made for this chat, not yet used.
     if (!a || a.uploaderId !== me.id || a.status !== "READY" || a.messageId || !a.objectKey.startsWith(`chats/${m.chat.id}/`)) {
       throw new ApiError(400, "bad_attachment", "That upload can't be sent. Please try again.");
     }
     type = TYPE_FOR_KIND[a.kind] ?? "FILE";
   }
-  if (input.replyToId) {
-    const target = await db.message.findFirst({ where: { id: input.replyToId, chatId: m.chat.id, type: { not: "SYSTEM" } }, select: { id: true } });
-    if (!target) throw new ApiError(400, "bad_reply", "The message you replied to is gone.");
+  if (input.replyToId && !target) throw new ApiError(400, "bad_reply", "The message you replied to is gone.");
+
+  // Every write in one atomic statement (one round trip instead of a 7-step
+  // transaction): the message, its attachment, the chat's last-activity time,
+  // my receipt (sending implies having read up to here), and un-archiving the
+  // chat for other members who haven't muted it.
+  const id = uuidv7();
+  const now = new Date();
+  try {
+    await db.$executeRaw`
+      WITH msg AS (
+        INSERT INTO messages (id, chat_id, sender_id, client_id, type, text, reply_to_id, created_at)
+        VALUES (${id}::uuid, ${m.chat.id}::uuid, ${me.id}::uuid, ${input.clientId}, ${type}::"MessageType",
+                ${input.text || null}, ${input.replyToId ?? null}::uuid, ${now}::timestamp)
+        RETURNING id, created_at
+      ),
+      att AS (
+        UPDATE attachments SET message_id = msg.id FROM msg
+        WHERE attachments.id = ${input.attachmentId ?? null}::uuid
+        RETURNING attachments.id
+      ),
+      ch AS (
+        UPDATE chats SET last_message_at = msg.created_at, updated_at = msg.created_at FROM msg
+        WHERE chats.id = ${m.chat.id}::uuid
+        RETURNING chats.id
+      ),
+      rc AS (
+        INSERT INTO receipts (chat_id, user_id, last_delivered_at, last_read_at, updated_at)
+        SELECT ${m.chat.id}::uuid, ${me.id}::uuid, created_at, created_at, created_at FROM msg
+        ON CONFLICT (chat_id, user_id) DO UPDATE
+          SET last_delivered_at = EXCLUDED.last_delivered_at, last_read_at = EXCLUDED.last_read_at, updated_at = EXCLUDED.updated_at
+        RETURNING chat_id
+      ),
+      un AS (
+        UPDATE chat_members SET archived_at = NULL
+        WHERE chat_id = ${m.chat.id}::uuid AND user_id <> ${me.id}::uuid AND archived_at IS NOT NULL AND muted_until IS NULL
+        RETURNING user_id
+      )
+      SELECT 1`;
+  } catch (err) {
+    // Two requests with the same clientId raced: the other one stored it.
+    const again = await findDupe();
+    if (again && again.chatId === m.chat.id) return toMessage(again);
+    throw err;
   }
 
-  const created = await db.$transaction(async (tx) => {
-    const row = await tx.message.create({
-      data: {
-        chatId: m.chat.id,
-        senderId: me.id,
-        clientId: input.clientId,
-        type,
-        text: input.text || null,
-        replyToId: input.replyToId ?? null,
-      },
-      select: { id: true, createdAt: true },
-    });
-    if (input.attachmentId) {
-      await tx.attachment.update({ where: { id: input.attachmentId }, data: { messageId: row.id } });
-    }
-    await tx.chat.update({ where: { id: m.chat.id }, data: { lastMessageAt: row.createdAt } });
-    // Sending implies having read everything up to this point.
-    await tx.receipt.upsert({
-      where: { chatId_userId: { chatId: m.chat.id, userId: me.id } },
-      create: { chatId: m.chat.id, userId: me.id, lastReadAt: row.createdAt, lastDeliveredAt: row.createdAt },
-      update: { lastReadAt: row.createdAt, lastDeliveredAt: row.createdAt },
-    });
-    // A new message brings an archived, unmuted chat back for everyone else.
-    await tx.chatMember.updateMany({
-      where: { chatId: m.chat.id, userId: { not: me.id }, archivedAt: { not: null }, mutedUntil: null },
-      data: { archivedAt: null },
-    });
-    return row;
-  });
-
-  const dto = (await getMessage(me.id, created.id))!;
-  await Promise.all([broadcast("message.new", dto), touchLastSeen(me.id)]);
+  const dto = (await getMessage(me.id, id))!;
+  // Recipients hear about it right after the response is sent; the sender
+  // already has the message from this response.
+  after(() => Promise.all([broadcast("message.new", dto), touchLastSeen(me.id)]));
   after(() => pushNewMessage(dto));
-  if (input.text && firstUrl(input.text)) after(() => attachLinkPreview(me.id, created.id));
+  if (input.text && firstUrl(input.text)) after(() => attachLinkPreview(me.id, id));
   return dto;
 }
 

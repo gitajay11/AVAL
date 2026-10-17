@@ -6,6 +6,7 @@ import { Bell, BellOff, Crown, LogOut, Shield, UserMinus, UserPlus } from "lucid
 import { useUser } from "@/components/app/user-context";
 import { AvatarPicker } from "@/components/profile/avatar-picker";
 import { Avatar } from "@/components/ui/avatar";
+import { ViewableAvatar } from "@/components/ui/avatar-viewer";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/field";
 import { Sheet } from "@/components/ui/sheet";
@@ -98,7 +99,7 @@ export function GroupInfoSheet({
           <AvatarPicker name={chat.title} avatarUrl={chat.avatarUrl} chatId={chat.id} size={88} onChange={() => router.refresh()} />
         ) : (
           <div className="flex justify-center">
-            <Avatar name={chat.title} src={chat.avatarUrl} size={88} />
+            <ViewableAvatar name={chat.title} src={chat.avatarUrl} size={88} />
           </div>
         )}
 

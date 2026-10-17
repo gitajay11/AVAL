@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Clock3, Eye, Flag, Lock } from "lucide-react";
 import { ReportSheet, type ReportTarget } from "@/components/chats/dialogs";
-import { Avatar } from "@/components/ui/avatar";
+import { ViewableAvatar } from "@/components/ui/avatar-viewer";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
 import { Sheet } from "@/components/ui/sheet";
@@ -53,8 +53,10 @@ export function PublicContactSheet({
       <Sheet open={contact !== null} onClose={onClose} title="Public contact">
         {contact && (
           <div className="flex flex-col items-center gap-2 pt-1 text-center">
-            <Avatar name={contact.name} src={contact.avatarUrl} size={88} />
+            <ViewableAvatar name={contact.name} src={contact.avatarUrl} size={88} />
             <p className="mt-1 text-xl font-bold">{contact.name}</p>
+            <p className="text-[15px] text-muted">@{contact.username}</p>
+            <p className="glass-flat rounded-full px-2.5 py-0.5 text-xs font-semibold text-muted">Personal contact · by @{contact.ownerUsername}</p>
             <p className="flex items-center gap-1.5 text-sm text-muted">
               <Lock className="size-3.5" aria-hidden="true" /> Its conversation is private until the owner approves you.
             </p>

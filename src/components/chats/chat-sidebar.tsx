@@ -1,9 +1,11 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Archive, Bell, BookUser, ChevronLeft, ChevronRight, MessageCircleMore, Search, SquarePen, Star, UserRound, UsersRound, X } from "lucide-react";
 import { PublicContactResults } from "@/components/contacts/public-contact-results";
 import { useNotifications } from "@/components/notifications/notifications-provider";
@@ -13,12 +15,16 @@ import { VerifyBanner } from "@/components/app/verify-banner";
 import { useRealtime } from "@/components/realtime/realtime-provider";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { Avatar } from "@/components/ui/avatar";
+import { FloatingBar } from "@/components/ui/floating-bar";
 import { cn } from "@/lib/cn";
+import type { ChatListItemDTO } from "@/lib/chats/types";
 import { useChats } from "./chat-store";
 import { ChatListItem } from "./chat-list-item";
 import { MessageResults } from "./message-results";
-import { NewGroupSheet } from "./new-group";
 import { PeopleResults } from "./people-results";
+
+// Only needed once someone starts a group: fetched after the list is up.
+const NewGroupSheet = dynamic(() => import("./new-group").then((m) => m.NewGroupSheet), { ssr: false });
 
 function ConnectionPill() {
   const { status } = useRealtime();
@@ -27,6 +33,59 @@ function ConnectionPill() {
     <span className="rounded-full bg-surface-3 px-2 py-0.5 text-xs font-semibold text-muted" role="status">
       Connecting…
     </span>
+  );
+}
+
+/** Past this many rows the list is virtualised (shorter lists keep their add/remove animations). */
+const VIRTUALIZE_AT = 60;
+const ROW = 70; // estimated row height incl. the 6px gap
+
+function VirtualChatList({ chats, meId, activeId, typing, scroller }: {
+  chats: ChatListItemDTO[];
+  meId: string;
+  activeId: string | null;
+  typing: Record<string, unknown>;
+  scroller: React.RefObject<HTMLDivElement | null>;
+}) {
+  const list = useRef<HTMLUListElement>(null);
+  const [margin, setMargin] = useState(0);
+  useLayoutEffect(() => {
+    const el = list.current;
+    if (!el) return;
+    const update = () => setMargin(el.offsetTop);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el.parentElement!);
+    return () => ro.disconnect();
+  }, []);
+  // TanStack Virtual keeps its own mutable state, so the React Compiler skips this component.
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const v = useVirtualizer({
+    count: chats.length,
+    getScrollElement: () => scroller.current,
+    estimateSize: () => ROW,
+    getItemKey: (i) => chats[i].id,
+    overscan: 6,
+    gap: 6,
+    scrollMargin: margin,
+  });
+  return (
+    <ul ref={list} className="relative my-1.5" style={{ height: v.getTotalSize() }}>
+      {v.getVirtualItems().map((row) => {
+        const chat = chats[row.index];
+        return (
+          <ChatListItem
+            key={chat.id}
+            prefetchContent={row.index < 6}
+            chat={chat}
+            meId={meId}
+            active={chat.id === activeId}
+            typing={Boolean(typing[chat.id])}
+            virtual={{ index: row.index, start: row.start - margin, measure: v.measureElement }}
+          />
+        );
+      })}
+    </ul>
   );
 }
 
@@ -40,6 +99,7 @@ export function ChatSidebar() {
   const [compose, setCompose] = useState<{ x: number; y: number } | null>(null);
   const [newGroup, setNewGroup] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
   const activeId = pathname.startsWith("/chats/") ? pathname.split("/")[2] : null;
   const searching = query.trim().length > 0;
   // The section you're in shows as a glowing gradient-glass capsule.
@@ -60,9 +120,10 @@ export function ChatSidebar() {
   const listEmpty = !searching && !showArchived && chats.length === 0;
 
   return (
-    <>
-      <header className="glass-2 sticky top-0 z-10 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2">
-        <div className="flex items-center gap-3">
+    // One scroller: the list slides under the floating bar (and its glass blurs it).
+    <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom)]">
+      <FloatingBar className="px-3 pt-2.5 pb-3">
+        <div className="flex items-center gap-1 sm:gap-2">
           {showArchived ? (
             <button
               type="button"
@@ -77,13 +138,13 @@ export function ChatSidebar() {
               <Avatar name={me.displayName} src={me.avatarUrl} size={38} />
             </Link>
           )}
-          <h1 className="flex flex-1 items-center gap-2 text-xl font-extrabold tracking-tight">
+          <h1 className="floating-title flex min-w-0 flex-1 items-center gap-2 text-xl font-extrabold tracking-tight">
             {showArchived ? "Archived" : "Chats"} <ConnectionPill />
           </h1>
           <Link
             href="/notifications"
-            {...navProps("/notifications", "relative grid size-10 place-items-center rounded-xl text-muted hover:bg-surface-3 hover:text-fg")}
-            aria-label={unreadNotifications ? `Notifications, ${unreadNotifications} new` : "Notifications"}
+            {...navProps("/notifications", "relative grid size-9 place-items-center rounded-xl text-muted hover:bg-surface-3 hover:text-fg sm:size-10")}
+            aria-label={unreadNotifications ? `Notifications, ${unreadNotifications > 9 ? "9+" : unreadNotifications} new` : "Notifications"}
           >
             <Bell className="size-5" />
             {unreadNotifications > 0 && (
@@ -94,14 +155,14 @@ export function ChatSidebar() {
           </Link>
           <Link
             href="/contacts"
-            {...navProps("/contacts", "grid size-10 place-items-center rounded-xl text-muted hover:bg-surface-3 hover:text-fg")}
+            {...navProps("/contacts", "grid size-9 place-items-center rounded-xl text-muted hover:bg-surface-3 hover:text-fg sm:size-10")}
             aria-label="Contacts"
           >
             <BookUser className="size-5" />
           </Link>
           <Link
             href="/saved"
-            {...navProps("/saved", "grid size-10 place-items-center rounded-xl text-muted hover:bg-surface-3 hover:text-fg")}
+            {...navProps("/saved", "grid size-9 place-items-center rounded-xl text-muted hover:bg-surface-3 hover:text-fg sm:size-10")}
             aria-label="Starred messages"
           >
             <Star className="size-5" />
@@ -112,7 +173,7 @@ export function ChatSidebar() {
               const r = e.currentTarget.getBoundingClientRect();
               setCompose({ x: r.right - 200, y: r.bottom + 4 });
             }}
-            className="grid size-10 place-items-center rounded-xl text-muted hover:bg-surface-3 hover:text-fg"
+            className="grid size-9 place-items-center rounded-xl text-muted hover:bg-surface-3 hover:text-fg sm:size-10"
             aria-label="New chat"
             aria-haspopup="menu"
           >
@@ -155,20 +216,20 @@ export function ChatSidebar() {
             </button>
           )}
         </label>
-      </header>
+      </FloatingBar>
 
       {!me.emailVerified && <VerifyBanner />}
       {!searching && !showArchived && <InstallBanner />}
 
-      <nav aria-label="Chats" className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom)]">
+      <nav aria-label="Chats" className="pt-1">
         {searching && chatMatches.length > 0 && (
-          <h3 className="px-5 pt-3 pb-1.5 text-xs font-bold tracking-wide text-muted uppercase">Chats</h3>
+          <h3 className="px-5 pt-3 pb-1.5 text-xs font-bold tracking-wide text-fg/80 uppercase">Chats</h3>
         )}
         {!searching && !showArchived && archived.length > 0 && (
           <button
             type="button"
             onClick={() => setShowArchived(true)}
-            className="mx-2 mt-1 flex w-[calc(100%-1rem)] items-center gap-3 rounded-2xl px-2.5 py-2 text-left hover:bg-surface-2"
+            className="glass-1 glass-sheen mx-2 mt-1 flex w-[calc(100%-1rem)] items-center gap-3 rounded-2xl px-2.5 py-2 text-left transition-transform active:scale-[0.97]"
           >
             <span className="grid size-[52px] place-items-center rounded-full bg-surface-3 text-muted">
               <Archive className="size-6" aria-hidden="true" />
@@ -180,11 +241,15 @@ export function ChatSidebar() {
             <ChevronRight className="size-5 text-subtle" aria-hidden="true" />
           </button>
         )}
+        {chatMatches.length > VIRTUALIZE_AT ? (
+          <VirtualChatList chats={chatMatches} meId={me.id} activeId={activeId} typing={typing} scroller={scroller} />
+        ) : (
         <ul className="flex flex-col gap-1.5 py-1.5">
           <AnimatePresence initial={false}>
-            {chatMatches.map((chat) => (
+            {chatMatches.map((chat, i) => (
               <ChatListItem
                 key={chat.id}
+                prefetchContent={i < 6}
                 chat={chat}
                 meId={me.id}
                 active={chat.id === activeId}
@@ -193,17 +258,18 @@ export function ChatSidebar() {
             ))}
           </AnimatePresence>
         </ul>
+        )}
 
         {searching && <PeopleResults query={query} onOpened={() => setQuery("")} />}
         {searching && <PublicContactResults query={query} heading="Public contacts" />}
         {searching && <MessageResults query={query} meId={me.id} onOpened={() => setQuery("")} />}
 
         {showArchived && !searching && archived.length === 0 && (
-          <p className="px-6 py-10 text-center text-[15px] text-muted">No archived chats. Swipe a chat or right-click it to archive.</p>
+          <p className="glass-1 mx-4 mt-4 rounded-2xl px-6 py-8 text-center text-[15px] text-muted">No archived chats. Swipe a chat or right-click it to archive.</p>
         )}
 
         {listEmpty && (
-          <div className="flex flex-col items-center gap-4 px-8 pt-16 text-center">
+          <div className="glass-1 mx-4 mt-6 flex flex-col items-center gap-4 rounded-3xl px-6 py-8 text-center">
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -226,6 +292,6 @@ export function ChatSidebar() {
           </div>
         )}
       </nav>
-    </>
+    </div>
   );
 }

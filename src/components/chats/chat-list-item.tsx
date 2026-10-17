@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { animate, motion, useMotionValue, useTransform } from "motion/react";
-import { useState, useSyncExternalStore } from "react";
+import { memo, useState, useSyncExternalStore } from "react";
 import { Archive, ArchiveRestore, Bell, BellOff, Check, CheckCheck, Mail, MailOpen, Pin, PinOff } from "lucide-react";
 import { ActionMenu, useLongPress, type MenuItem } from "@/components/ui/action-menu";
 import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/cn";
 import { ClientTime, formatListTime } from "@/lib/client/time";
 import type { ChatListItemDTO } from "@/lib/chats/types";
-import { useChats } from "./chat-store";
+import { useChatCommands } from "./chat-store";
 import { snippetOf } from "./message-snippet";
 import { TypingDots } from "./typing-dots";
 
@@ -47,8 +47,25 @@ const OPEN = ACTION_W * 2;
  * Chat row. Touch: swipe left for Mute/Archive, right for Pin/Read. Mouse:
  * right-click for the same actions. Long-press also opens the menu.
  */
-export function ChatListItem({ chat, meId, active, typing }: { chat: ChatListItemDTO; meId: string; active: boolean; typing: boolean }) {
-  const { updateSettings, markRead } = useChats();
+/** Memoised: a list update re-renders only the rows whose chat changed. */
+export const ChatListItem = memo(function ChatListItem({
+  chat,
+  meId,
+  active,
+  typing,
+  prefetchContent = false,
+  virtual,
+}: {
+  chat: ChatListItemDTO;
+  meId: string;
+  active: boolean;
+  typing: boolean;
+  /** Prefetch the conversation itself (top chats), not just the page shell. */
+  prefetchContent?: boolean;
+  /** In a virtualised list: where the row sits, and the measuring ref. */
+  virtual?: { index: number; start: number; measure: (el: HTMLElement | null) => void };
+}) {
+  const { updateSettings, markRead } = useChatCommands();
   const touch = useTouch();
   const x = useMotionValue(0);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
@@ -78,7 +95,14 @@ export function ChatListItem({ chat, meId, active, typing }: { chat: ChatListIte
   const swipeBtn = "flex h-full w-[76px] flex-col items-center justify-center gap-1 text-xs font-semibold text-white";
 
   return (
-    <motion.li layout="position" transition={{ type: "spring", stiffness: 500, damping: 40 }} className="relative mx-2 overflow-hidden rounded-2xl">
+    <motion.li
+      ref={virtual?.measure}
+      data-index={virtual?.index}
+      layout={virtual ? false : "position"}
+      transition={{ type: "spring", stiffness: 500, damping: 40 }}
+      className={cn("relative mx-2 overflow-hidden rounded-2xl", virtual && "absolute top-0 right-0 left-0")}
+      style={virtual ? { transform: `translateY(${virtual.start}px)` } : undefined}
+    >
       {touch && (
         <motion.div className="absolute inset-0 flex justify-between" style={{ opacity: actionsOpacity }} aria-hidden="true">
           <div className="flex">
@@ -117,7 +141,7 @@ export function ChatListItem({ chat, meId, active, typing }: { chat: ChatListIte
       >
         <Link
           href={`/chats/${chat.id}`}
-          prefetch
+          prefetch={prefetchContent ? true : undefined}
           aria-current={active ? "page" : undefined}
           onClick={(e) => {
             // An open swipe closes on tap instead of navigating.
@@ -171,4 +195,4 @@ export function ChatListItem({ chat, meId, active, typing }: { chat: ChatListIte
       <ActionMenu anchor={menu} onClose={() => setMenu(null)} items={items} label={`Actions for ${chat.title}`} />
     </motion.li>
   );
-}
+});

@@ -3,6 +3,7 @@
 import type { MediaKind } from "@/lib/chats/types";
 import { kindForFile, MEDIA_LIMITS, normalizeMime } from "@/lib/media/policy";
 import { api, ClientApiError } from "./api";
+import { canEncodeWebp, toBlob } from "./crop";
 
 export type PreparedMedia = {
   kind: MediaKind;
@@ -15,11 +16,13 @@ export type PreparedMedia = {
   waveform?: number[];
 };
 
-const MAX_IMAGE_SIDE = 2560;
+const MAX_IMAGE_SIDE = 1920;
+const QUALITY = 0.82;
 
 /**
- * Images are re-encoded in the browser: large photos are downscaled, and
- * re-encoding drops EXIF metadata (including GPS location). GIFs keep their animation.
+ * Images are re-encoded in the browser: downscaled to 1920px on the long side
+ * and compressed to WebP (JPEG/PNG where WebP can't be encoded), which also drops
+ * EXIF metadata (including GPS location). GIFs keep their animation.
  */
 async function prepareImage(file: File): Promise<PreparedMedia> {
   const mime = normalizeMime(file.type);
@@ -39,11 +42,21 @@ async function prepareImage(file: File): Promise<PreparedMedia> {
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(bitmap, 0, 0, w, h);
   bitmap.close();
-  // Keep PNG for graphics with transparency; everything else becomes JPEG.
-  const outType = mime === "image/png" ? "image/png" : "image/jpeg";
-  const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, outType, 0.86));
-  if (!blob) throw new ClientApiError(0, "encode", "Couldn't process that image.");
-  return { kind: "IMAGE", blob, contentType: outType, fileName: file.name, width: w, height: h };
+  return encodeImage(canvas, mime, file.name);
+}
+
+/** Canvas → upload-ready image (also used after cropping). */
+export async function encodeImage(canvas: HTMLCanvasElement, sourceMime: string, fileName: string | null): Promise<PreparedMedia> {
+  // WebP keeps transparency; without it, PNG stays PNG and everything else becomes JPEG.
+  const outType = canEncodeWebp() ? "image/webp" : sourceMime === "image/png" ? "image/png" : "image/jpeg";
+  let blob: Blob;
+  try {
+    blob = await toBlob(canvas, outType, QUALITY);
+  } catch {
+    throw new ClientApiError(0, "encode", "Couldn't process that image.");
+  }
+  const name = fileName ? fileName.replace(/\.[^.]+$/, "") + "." + (outType === "image/webp" ? "webp" : outType === "image/png" ? "png" : "jpg") : null;
+  return { kind: "IMAGE", blob, contentType: outType, fileName: name, width: canvas.width, height: canvas.height };
 }
 
 function videoMeta(file: File): Promise<{ width: number; height: number; durationMs: number }> {

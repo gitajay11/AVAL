@@ -16,9 +16,6 @@ declare global {
   }
 }
 
-/** Runs in <head>: keep Chrome's own mini-infobar away and hold the event for our UI. */
-export const installScript = `window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.__avalInstall=e;});`;
-
 export const BUILD_ID = process.env.NEXT_PUBLIC_BUILD_ID ?? "dev";
 const DISMISS_COOKIE = "aval-install";
 const UPDATE_CHECK_MS = 30 * 60_000;

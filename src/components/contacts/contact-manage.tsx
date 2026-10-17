@@ -17,6 +17,8 @@ import { useToast } from "@/components/ui/toast";
 import { api, ClientApiError } from "@/lib/client/api";
 import { ClientTime, formatListTime } from "@/lib/client/time";
 import type { ContactDetailDTO } from "@/lib/contacts/types";
+import { FloatingBar } from "@/components/ui/floating-bar";
+import { UsernameField, useUsernameField } from "@/components/ui/username-field";
 
 const VISIBILITY = [
   { value: "PRIVATE" as const, label: "Private" },
@@ -29,7 +31,8 @@ export function ContactManage({ initial }: { initial: ContactDetailDTO }) {
   const toast = useToast();
   const [detail, setDetail] = useState(initial);
   const { contact } = detail;
-  const [form, setForm] = useState({ name: contact.name, note: contact.note ?? "" });
+  const [form, setForm] = useState({ name: contact.name, username: contact.username, note: contact.note ?? "" });
+  const handle = useUsernameField(form.username, contact.username);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [confirmPrivate, setConfirmPrivate] = useState(false);
@@ -59,10 +62,17 @@ export function ContactManage({ initial }: { initial: ContactDetailDTO }) {
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    if (handle.blocked && (handle.state.status === "taken" || handle.state.status === "invalid")) {
+      setFields({ username: handle.state.reason });
+      return;
+    }
     setSaving(true);
     setFields({});
     try {
-      await patch({ name: form.name, note: form.note || null }, "Saved");
+      await patch(
+        { name: form.name, note: form.note || null, ...(handle.unchanged ? {} : { username: form.username }) },
+        "Saved",
+      );
     } catch (err) {
       if (err instanceof ClientApiError) setFields(err.fields);
       fail(err, "Couldn't save.");
@@ -121,19 +131,19 @@ export function ContactManage({ initial }: { initial: ContactDetailDTO }) {
     }
   }
 
-  const dirty = form.name !== contact.name || form.note !== (contact.note ?? "");
+  const dirty = form.name !== contact.name || form.note !== (contact.note ?? "") || !handle.unchanged;
 
   return (
     <div className="h-full overflow-y-auto">
-      <header className="glass sticky top-0 z-10 flex items-center gap-2 border-b border-line px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3">
+      <FloatingBar className="flex items-center gap-2 px-2 py-2">
         <Link href="/contacts" className="grid size-10 place-items-center rounded-xl hover:bg-surface-3" aria-label="Back to contacts">
           <ChevronLeft className="size-6" />
         </Link>
-        <h1 className="min-w-0 flex-1 truncate px-1 text-xl font-extrabold tracking-tight">{contact.name}</h1>
+        <h1 className="floating-title min-w-0 flex-1 truncate px-1 text-xl font-extrabold tracking-tight">{contact.name}</h1>
         <Link href={`/chats/${contact.chatId}`} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-brand px-3.5 text-sm font-semibold text-white">
           <MessageSquareText className="size-4" aria-hidden="true" /> Open chat
         </Link>
-      </header>
+      </FloatingBar>
 
       <div className="mx-auto flex max-w-2xl flex-col gap-7 px-4 py-6 pb-[max(2rem,env(safe-area-inset-bottom))]">
         <Section id="contact-profile" title="Contact">
@@ -149,6 +159,7 @@ export function ContactManage({ initial }: { initial: ContactDetailDTO }) {
               }}
             />
             <Input label="Name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} error={fields.name} maxLength={64} />
+            <UsernameField value={form.username} current={contact.username} onChange={(username) => setForm((f) => ({ ...f, username }))} error={fields.username} />
             <Textarea label="Note" optional value={form.note} onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))} error={fields.note} maxLength={500} rows={3} hint="Only you can see the note." />
             <div className="flex justify-end">
               <Button type="submit" loading={saving} disabled={!dirty}>

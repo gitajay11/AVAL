@@ -28,6 +28,8 @@ export function useVoiceRecorder() {
     timer: ReturnType<typeof setInterval>;
     startedAt: number;
   } | null>(null);
+  // Bumped by cancel(): a start() still waiting for the microphone then gives up.
+  const generation = useRef(0);
 
   const teardown = useCallback(() => {
     const r = rec.current;
@@ -40,18 +42,24 @@ export function useVoiceRecorder() {
 
   useEffect(() => teardown, [teardown]);
 
-  const start = useCallback(async () => {
-    if (rec.current) return;
+  /** Resolves to whether recording started (false: unsupported, blocked, or cancelled meanwhile). */
+  const start = useCallback(async (): Promise<boolean> => {
+    if (rec.current) return true;
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
       setState({ status: "error", message: "Voice messages aren't supported in this browser." });
-      return;
+      return false;
     }
+    const gen = ++generation.current;
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
     } catch {
       setState({ status: "error", message: "Microphone access was blocked. Allow it in your browser settings." });
-      return;
+      return false;
+    }
+    if (gen !== generation.current || rec.current) {
+      stream.getTracks().forEach((t) => t.stop());
+      return false;
     }
     const mimeType = MIME_PREFERENCE.find((m) => MediaRecorder.isTypeSupported(m));
     const recorder = new MediaRecorder(stream, mimeType ? { mimeType, audioBitsPerSecond: 32_000 } : undefined);
@@ -76,6 +84,7 @@ export function useVoiceRecorder() {
     }, 100);
     rec.current = { recorder, stream, ctx, chunks, samples, timer, startedAt };
     setState({ status: "recording", startedAt, levels: [] });
+    return true;
   }, []);
 
   /** Stop and return the recording (null if it was too short). */
@@ -104,6 +113,7 @@ export function useVoiceRecorder() {
   }, [teardown]);
 
   const cancel = useCallback(() => {
+    generation.current++;
     const r = rec.current;
     if (r && r.recorder.state !== "inactive") r.recorder.stop();
     teardown();

@@ -7,6 +7,7 @@ export type MyContactDTO = {
   id: string;
   chatId: string;
   name: string;
+  username: string;
   note: string | null;
   avatarUrl: string | null;
   visibility: Visibility;
@@ -22,12 +23,15 @@ export type AccessGrantDTO = { user: ContactUserDTO; grantedAt: string };
 export type ContactDetailDTO = { contact: MyContactDTO; requests: AccessRequestDTO[]; grants: AccessGrantDTO[] };
 
 /**
- * What anyone else may know about a public contact: name and avatar only,
- * plus the state of their own request (and the chat once approved).
+ * What anyone else may know about a public contact: name, @username, avatar
+ * and whose contact it is, plus the state of their own request (and the chat once approved).
  */
 export type PublicContactDTO = {
   id: string;
   name: string;
+  username: string;
+  /** Whose contact it is, for the "Personal contact · by @owner" badge. */
+  ownerUsername: string;
   avatarUrl: string | null;
   request: RequestState;
   chatId: string | null; // only when approved

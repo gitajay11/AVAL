@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cacheLife } from "next/cache";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ChatView } from "@/components/chats/chat-view";
@@ -8,11 +9,23 @@ import { getChatDetail } from "@/lib/chats/detail";
 
 export const metadata: Metadata = { title: "Chat" };
 
-async function ChatLoader({ params }: { params: PageProps<"/chats/[chatId]">["params"] }) {
-  const { chatId } = await params;
+/**
+ * Private cache: never stored on the server, kept only in this browser's memory
+ * (gone on reload) for 30 s. That lets a chat-list link prefetch the chat ahead
+ * of the tap, reopening a recent chat needs no request, and the staged render
+ * of one navigation computes this once instead of per stage.
+ */
+async function loadChat(chatId: string) {
+  "use cache: private";
+  cacheLife("seconds");
   const user = await requireUser();
   // Membership is checked inside: non-members get the same 404 as a missing chat.
-  const detail = await getChatDetail(user, chatId);
+  return getChatDetail(user, chatId);
+}
+
+async function ChatLoader({ params }: { params: PageProps<"/chats/[chatId]">["params"] }) {
+  const { chatId } = await params;
+  const detail = await loadChat(chatId);
   if (!detail) notFound();
   return <ChatView key={chatId} detail={detail} />;
 }
