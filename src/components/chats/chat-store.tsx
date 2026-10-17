@@ -99,6 +99,8 @@ type Ctx = {
   /** Pin / archive / mute / mark unread, optimistic with rollback. */
   updateSettings: (chatId: string, patch: SettingsPatch) => void;
   refetchChat: (chatId: string) => void;
+  /** Reload the whole chat list from the server. */
+  refresh: () => Promise<void>;
   typing: TypingMap;
 };
 
@@ -296,8 +298,8 @@ export function ChatsProvider({
   }, [status, refresh]);
 
   const value = useMemo<Ctx>(
-    () => ({ chats: state.chats, activeChatId, setActiveChat, applyMessage, upsertChat, markRead, updateSettings, refetchChat, typing }),
-    [state.chats, activeChatId, applyMessage, upsertChat, markRead, updateSettings, refetchChat, typing],
+    () => ({ chats: state.chats, activeChatId, setActiveChat, applyMessage, upsertChat, markRead, updateSettings, refetchChat, refresh, typing }),
+    [state.chats, activeChatId, applyMessage, upsertChat, markRead, updateSettings, refetchChat, refresh, typing],
   );
 
   const commands = useMemo<Commands>(() => ({ updateSettings, markRead }), [updateSettings, markRead]);
