@@ -1,9 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { AnimatePresence, motion, Reorder } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ArrowUp, Camera, Check, ChevronLeft, ChevronUp, Crop, FileText, Images, Lock, Mic, Music, Paperclip, Pencil, Play, Reply, Smile, Trash2, X } from "lucide-react";
+import { ArrowUp, Camera, Check, ChevronLeft, ChevronUp, FileText, Images, Lock, Mic, Music, Paperclip, Pencil, Reply, Smile, Trash2, X } from "lucide-react";
 import { Sheet } from "@/components/ui/sheet";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
@@ -17,6 +17,8 @@ import { EmojiPicker } from "./emoji-picker";
 import { snippetOf } from "./message-snippet";
 import { useVoiceRecorder } from "./use-voice-recorder";
 
+// Only loaded once something is picked.
+const AttachmentGrid = dynamic(() => import("./attachment-grid").then((m) => m.AttachmentGrid), { ssr: false });
 // Only loaded once someone crops a photo.
 const ImageCropper = dynamic(() => import("@/components/ui/image-cropper").then((m) => m.ImageCropper), { ssr: false });
 
@@ -39,7 +41,7 @@ const MEDIA_ASPECTS = [
 
 export type ComposerSubmit = { text: string; media: PreparedMedia[] };
 
-type Picked = {
+export type Picked = {
   id: string;
   /** The original, so a second crop starts from the full picture. */
   file: File;
@@ -388,69 +390,7 @@ export function Composer({ chatId, onSend, onTyping, replyTo, onCancelReply, edi
                     </p>
                     {items.length > 1 && <p className="text-xs text-subtle">Drag to reorder</p>}
                   </div>
-                  <Reorder.Group
-                    axis="x"
-                    values={items}
-                    onReorder={setItems}
-                    className="flex gap-2 overflow-x-auto overscroll-contain px-1 pt-1 pb-1.5"
-                    aria-label="Attachments"
-                  >
-                    {items.map((item, idx) => (
-                      <Reorder.Item
-                        key={item.id}
-                        value={item}
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          // Keyboard reorder: Alt + ←/→.
-                          if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
-                            e.preventDefault();
-                            move(item.id, e.key === "ArrowLeft" ? -1 : 1);
-                          }
-                          if (e.key === "Delete" || e.key === "Backspace") removeItem(item.id);
-                        }}
-                        aria-label={`${item.prepared.fileName ?? item.prepared.kind.toLowerCase()}, ${idx + 1} of ${items.length}. Alt+arrow keys to move, Delete to remove.`}
-                        className="relative size-[76px] shrink-0 cursor-grab touch-pan-y overflow-hidden rounded-2xl bg-surface-3 select-none active:cursor-grabbing"
-                        whileDrag={{ scale: 1.06, zIndex: 2 }}
-                      >
-                        {item.preview && item.prepared.kind === "IMAGE" ? (
-                          // eslint-disable-next-line @next/next/no-img-element -- local preview of the picked image
-                          <img src={item.preview} alt="" draggable={false} className="size-full object-cover" />
-                        ) : item.preview && item.prepared.kind === "VIDEO" ? (
-                          <>
-                            <video src={item.preview} muted playsInline preload="metadata" className="size-full object-cover" />
-                            <span className="absolute inset-0 grid place-items-center">
-                              <span className="grid size-7 place-items-center rounded-full bg-black/45 text-white">
-                                <Play className="size-3.5 translate-x-px" fill="currentColor" aria-hidden="true" />
-                              </span>
-                            </span>
-                          </>
-                        ) : (
-                          <span className="flex size-full flex-col items-center justify-center gap-1 bg-brand px-1.5 text-white">
-                            <FileText className="size-5 shrink-0" aria-hidden="true" />
-                            <span className="w-full truncate text-center text-[10px] font-semibold">{item.prepared.fileName ?? "File"}</span>
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => removeItem(item.id)}
-                          className="absolute top-1 right-1 grid size-6 place-items-center rounded-full bg-black/55 text-white"
-                          aria-label="Remove"
-                        >
-                          <X className="size-3.5" />
-                        </button>
-                        {item.prepared.kind === "IMAGE" && item.prepared.contentType !== "image/gif" && (
-                          <button
-                            type="button"
-                            onClick={() => startCrop(item)}
-                            className="absolute bottom-1 left-1 grid size-6 place-items-center rounded-full bg-black/55 text-white"
-                            aria-label="Crop"
-                          >
-                            <Crop className="size-3.5" />
-                          </button>
-                        )}
-                      </Reorder.Item>
-                    ))}
-                  </Reorder.Group>
+                  <AttachmentGrid items={items} onReorder={setItems} onMove={move} onRemove={removeItem} onCrop={startCrop} />
                 </div>
               )}
             </div>

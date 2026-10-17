@@ -8,6 +8,7 @@ import type { TimelineItem, UiMessage } from "@/lib/chats/timeline";
 import { scrollBehavior } from "@/lib/client/motion";
 import { CHAT_HEADER_HEIGHT } from "./chat-header";
 import { MessageBubble, type Receipt } from "./message-bubble";
+import { cn } from "@/lib/cn";
 
 const DaySeparator = memo(function DaySeparator({ iso }: { iso: string }) {
   return (
@@ -189,9 +190,12 @@ export const MessageList = forwardRef<MessageListHandle, Props>(function Message
     [virtualizer],
   );
 
-  const rows = mounted ? virtualizer.getVirtualItems() : [];
   const tailStart = openAtBottom ? Math.max(0, items.length - SSR_TAIL) : initialIndex;
-  const tail = mounted ? [] : items.slice(tailStart, tailStart + SSR_TAIL);
+  // One keyed list for both modes, so the switch to virtual rows keeps the
+  // bubbles already rendered (only their wrappers move) instead of remounting them.
+  const entries: { key: string | number; index: number; start: number | null }[] = mounted
+    ? virtualizer.getVirtualItems().map((r) => ({ key: r.key as string | number, index: r.index, start: r.start - virtualizer.options.scrollMargin }))
+    : items.slice(tailStart, tailStart + SSR_TAIL).map((item, i) => ({ key: item.key, index: tailStart + i, start: null }));
 
   const renderItem = (item: TimelineItem) =>
     item.kind === "day" ? (
@@ -215,9 +219,12 @@ export const MessageList = forwardRef<MessageListHandle, Props>(function Message
       ref={scrollRef}
       data-message-scroller=""
       onScroll={() => check(false)}
-      className="chat-fade h-full overflow-y-auto overscroll-contain [overflow-anchor:none]"
+      // Before the virtual rows take over, column-reverse makes an overflowing tail
+      // start scrolled to its newest message (no JavaScript needed), so nothing
+      // moves when they do.
+      className={cn("chat-fade h-full overflow-y-auto overscroll-contain [overflow-anchor:none]", !mounted && "flex flex-col-reverse")}
     >
-      <div className="flex min-h-full flex-col">
+      <div className="flex min-h-full shrink-0 flex-col">
         {/* Short conversations sit at the bottom, like a chat. */}
         <div className="flex-1" />
         <div style={{ paddingTop: `calc(${CHAT_HEADER_HEIGHT + headerExtra}px + env(safe-area-inset-top))` }}>
@@ -230,19 +237,16 @@ export const MessageList = forwardRef<MessageListHandle, Props>(function Message
           </div>
         </div>
         <div ref={listRef} className="relative w-full" style={mounted ? { height: virtualizer.getTotalSize() } : undefined}>
-          {tail.map((item) => (
-            <div key={item.key}>{renderItem(item)}</div>
-          ))}
-          {rows.map((row) => {
+          {entries.map((row) => {
             const item = items[row.index];
             if (!item) return null;
             return (
               <div
                 key={row.key}
                 data-index={row.index}
-                ref={virtualizer.measureElement}
-                className="absolute top-0 left-0 w-full"
-                style={{ transform: `translateY(${row.start - virtualizer.options.scrollMargin}px)` }}
+                ref={row.start === null ? undefined : virtualizer.measureElement}
+                className={row.start === null ? undefined : "absolute top-0 left-0 w-full"}
+                style={row.start === null ? undefined : { transform: `translateY(${row.start}px)` }}
               >
                 {renderItem(item)}
               </div>

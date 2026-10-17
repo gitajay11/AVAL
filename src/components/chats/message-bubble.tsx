@@ -1,7 +1,7 @@
 "use client";
 
-import { memo, useSyncExternalStore } from "react";
-import { animate, AnimatePresence, motion, useMotionValue, useTransform } from "motion/react";
+import { memo } from "react";
+import { animate, AnimatePresence, motion, useDragControls, useMotionValue, useTransform } from "motion/react";
 import { AlertCircle, Check, CheckCheck, Clock3, Forward, Pin, Reply, Star } from "lucide-react";
 import { useLongPress } from "@/components/ui/action-menu";
 import { Avatar } from "@/components/ui/avatar";
@@ -38,8 +38,6 @@ function Ticks({ receipt, onBrand }: { receipt: Receipt; onBrand: boolean }) {
   );
 }
 
-const coarse = () => window.matchMedia("(pointer: coarse)").matches;
-const useTouch = () => useSyncExternalStore(() => () => {}, coarse, () => false);
 
 const SWIPE_TRIGGER = 64;
 /** Reaction chips beside a bubble: at most this many (the last becomes "+N"), each CHIP_H tall. */
@@ -78,11 +76,17 @@ export const MessageBubble = memo(function MessageBubble(props: Props) {
 function Bubble({ message, mine, groupStart, groupEnd, animate: animateIn, receipt, highlighted }: Props) {
   const actions = useChatActions();
   const showPeople = actions.isGroup && !mine;
-  const touch = useTouch();
   const x = useMotionValue(0);
   const replyIconOpacity = useTransform(x, [-SWIPE_TRIGGER, -16, 0], [1, 0, 0]);
   const interactive = !actions.readOnly && !message.deleted && message.status === "sent";
   const longPress = useLongPress((point) => actions.openMenu(message, point), interactive);
+  // Swipe to reply starts from a touch press (not from a "touch device?" check at
+  // render, which differs between server and client and re-rendered every bubble).
+  const drag = useDragControls();
+  const onPointerDown = (e: React.PointerEvent) => {
+    longPress.onPointerDown?.(e);
+    if (interactive && e.pointerType === "touch") drag.start(e);
+  };
 
   const jumbo = !message.deleted && !message.attachments.length && isJumboEmoji(message.text);
   const media = message.attachments.find((a) => a.kind === "IMAGE" || a.kind === "VIDEO");
@@ -167,7 +171,7 @@ function Bubble({ message, mine, groupStart, groupEnd, animate: animateIn, recei
       className={cn("relative flex px-3 sm:px-5", mine ? "justify-end" : "justify-start", groupStart ? "pt-2" : "pt-[3px]")}
       data-message-id={message.id}
     >
-      {touch && interactive && (
+      {interactive && (
         <motion.span
           style={{ opacity: replyIconOpacity }}
           className="pointer-events-none absolute top-1/2 right-4 grid size-8 -translate-y-1/2 place-items-center rounded-full bg-surface-3 text-accent"
@@ -180,7 +184,9 @@ function Bubble({ message, mine, groupStart, groupEnd, animate: animateIn, recei
         initial={animateIn ? { opacity: 0, y: 12, scale: 0.96, x: mine ? 12 : -12 } : false}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: "spring", stiffness: 520, damping: 34, mass: 0.7 }}
-        drag={touch && interactive ? "x" : false}
+        drag={interactive ? "x" : false}
+        dragListener={false}
+        dragControls={drag}
         dragDirectionLock
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={{ left: 0.45, right: 0 }}
@@ -194,6 +200,7 @@ function Bubble({ message, mine, groupStart, groupEnd, animate: animateIn, recei
         className={cn("flex max-w-[min(82%,560px)] items-end gap-2", mine && "flex-row-reverse")}
         style={{ transformOrigin: mine ? "bottom right" : "bottom left", x, touchAction: "pan-y", minHeight: stackHeight || undefined }}
         {...longPress}
+        onPointerDown={onPointerDown}
       >
         {showPeople && (
           <span className="w-8 shrink-0 self-end">

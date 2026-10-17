@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { animate, motion, useMotionValue, useTransform } from "motion/react";
-import { memo, useState, useSyncExternalStore } from "react";
+import { animate, motion, useDragControls, useMotionValue, useTransform } from "motion/react";
+import { memo, useState } from "react";
 import { Archive, ArchiveRestore, Bell, BellOff, Check, CheckCheck, Mail, MailOpen, Pin, PinOff } from "lucide-react";
 import { ActionMenu, useLongPress, type MenuItem } from "@/components/ui/action-menu";
 import { Avatar } from "@/components/ui/avatar";
@@ -37,8 +37,6 @@ function preview(chat: ChatListItemDTO, meId: string): React.ReactNode {
   );
 }
 
-const coarse = () => window.matchMedia("(pointer: coarse)").matches;
-const useTouch = () => useSyncExternalStore(() => () => {}, coarse, () => false);
 
 const ACTION_W = 76;
 const OPEN = ACTION_W * 2;
@@ -66,9 +64,15 @@ export const ChatListItem = memo(function ChatListItem({
   virtual?: { index: number; start: number; measure: (el: HTMLElement | null) => void };
 }) {
   const { updateSettings, markRead } = useChatCommands();
-  const touch = useTouch();
+  // Swipe actions start from a touch press, and their buttons render only then:
+  // the first render is the same on server and client (no re-render after hydration).
+  const [swiped, setSwiped] = useState(false);
+  const drag = useDragControls();
   const x = useMotionValue(0);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  // Mounted on first open (then kept, for its closing animation): rows hydrate faster.
+  const [menuUsed, setMenuUsed] = useState(false);
+  if (menu && !menuUsed) setMenuUsed(true);
   const unread = chat.unread > 0 || chat.markedUnread;
   const longPress = useLongPress(setMenu);
   // The card is see-through glass, so the swipe actions only show while it moves.
@@ -103,7 +107,7 @@ export const ChatListItem = memo(function ChatListItem({
       className={cn("relative mx-2 overflow-hidden rounded-2xl", virtual && "absolute top-0 right-0 left-0")}
       style={virtual ? { transform: `translateY(${virtual.start}px)` } : undefined}
     >
-      {touch && (
+      {swiped && (
         <motion.div className="absolute inset-0 flex justify-between" style={{ opacity: actionsOpacity }} aria-hidden="true">
           <div className="flex">
             <button type="button" tabIndex={-1} className={cn(swipeBtn, "bg-[#0f766e]")} onClick={run(() => updateSettings(chat.id, { pinned: !chat.pinned }))}>
@@ -129,7 +133,14 @@ export const ChatListItem = memo(function ChatListItem({
       )}
       <motion.div
         style={{ x, touchAction: "pan-y" }}
-        drag={touch ? "x" : false}
+        drag="x"
+        dragListener={false}
+        dragControls={drag}
+        onPointerDown={(e) => {
+          if (e.pointerType !== "touch") return;
+          setSwiped(true);
+          drag.start(e);
+        }}
         dragDirectionLock
         dragConstraints={{ left: -OPEN, right: OPEN }}
         dragElastic={0.08}
@@ -192,7 +203,7 @@ export const ChatListItem = memo(function ChatListItem({
           </div>
         </Link>
       </motion.div>
-      <ActionMenu anchor={menu} onClose={() => setMenu(null)} items={items} label={`Actions for ${chat.title}`} />
+      {menuUsed && <ActionMenu anchor={menu} onClose={() => setMenu(null)} items={items} label={`Actions for ${chat.title}`} />}
     </motion.li>
   );
 });
