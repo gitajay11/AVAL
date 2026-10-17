@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { IdleLink as Link } from "@/components/ui/idle-link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { BookUser, ChevronLeft, Eye, Globe, Lock, Plus, Search, Users } from "lucide-react";

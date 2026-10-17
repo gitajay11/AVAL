@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { IdleLink as Link } from "@/components/ui/idle-link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";

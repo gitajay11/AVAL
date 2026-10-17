@@ -75,27 +75,3 @@ export function AppShell({
     </UserProvider>
   );
 }
-
-export function AppShellSkeleton() {
-  return (
-    <div className="flex h-dvh" aria-busy="true" aria-label="Loading">
-      <aside className="flex w-full flex-col gap-3 p-4 md:w-[360px] md:border-r md:border-line lg:w-[400px]">
-        <div className="flex items-center gap-3">
-          <div className="size-[38px] rounded-full bg-surface-3" />
-          <div className="h-5 w-24 rounded-lg bg-surface-3" />
-        </div>
-        <div className="h-11 rounded-2xl bg-surface-3" />
-        {Array.from({ length: 6 }, (_, i) => (
-          <div key={i} className="flex items-center gap-3 py-1.5">
-            <div className="size-[52px] rounded-full bg-surface-3" />
-            <div className="flex flex-1 flex-col gap-2">
-              <div className="h-4 w-1/2 rounded-md bg-surface-3" />
-              <div className="h-3.5 w-3/4 rounded-md bg-surface-3" />
-            </div>
-          </div>
-        ))}
-      </aside>
-      <main className="hidden flex-1 md:block" />
-    </div>
-  );
-}

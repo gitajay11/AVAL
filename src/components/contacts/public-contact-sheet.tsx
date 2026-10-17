@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { IdleLink as Link } from "@/components/ui/idle-link";
 import { useState } from "react";
 import { Clock3, Eye, Flag, Lock } from "lucide-react";
 import { ReportSheet, type ReportTarget } from "@/components/chats/dialogs";

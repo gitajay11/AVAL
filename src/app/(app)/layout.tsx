@@ -1,5 +1,4 @@
-import { Suspense } from "react";
-import { AppShell, AppShellSkeleton } from "@/components/app/app-shell";
+import { AppShell } from "@/components/app/app-shell";
 import { requireUser } from "@/lib/auth/session";
 import { listChats } from "@/lib/chats/queries";
 import { avatarUrl } from "@/lib/users";
@@ -24,10 +23,14 @@ async function AuthedShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * The signed-in shell renders with the first HTML instead of streaming in
+ * behind a skeleton: the session check and the chat list take a few ms, and
+ * the real content then paints with the first frame (before any JavaScript
+ * runs) instead of after it. Pages under it still stream their own parts.
+ */
+export const instant = false;
+
 export default function AppLayout({ children }: LayoutProps<"/">) {
-  return (
-    <Suspense fallback={<AppShellSkeleton />}>
-      <AuthedShell>{children}</AuthedShell>
-    </Suspense>
-  );
+  return <AuthedShell>{children}</AuthedShell>;
 }

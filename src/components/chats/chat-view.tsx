@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Copy, Eye, Flag, Forward, Lock, Pencil, Pin, PinOff, Reply, Star, StarOff, Trash2 } from "lucide-react";
-import { PublicContactSheet } from "@/components/contacts/public-contact-sheet";
 import { useUser } from "@/components/app/user-context";
 import { useRealtime, useRealtimeEvent } from "@/components/realtime/realtime-provider";
 import { ActionMenu, type MenuItem } from "@/components/ui/action-menu";
@@ -23,14 +22,20 @@ import { ChatActionsContext, type ChatActions } from "./chat-actions";
 import { ChatHeader } from "./chat-header";
 import { useChats } from "./chat-store";
 import { Composer, type ComposerSubmit } from "./composer";
-import { DeleteDialog, ForwardSheet, ProfileSheet, ReportSheet, type ReportTarget } from "./dialogs";
+import type { ReportTarget } from "./dialogs";
 import type { Receipt } from "./message-bubble";
 import { MessageList, type MessageListHandle } from "./message-list";
+import { useMountOnce } from "@/components/ui/idle-link";
 
 // Split out of the chat screen's bundle: fetched once the screen is up.
 const ChatSearch = dynamic(() => import("./chat-search").then((m) => m.ChatSearch), { ssr: false });
 const GroupInfoSheet = dynamic(() => import("./group-info").then((m) => m.GroupInfoSheet), { ssr: false });
 const ReactionsSheet = dynamic(() => import("./reactions-sheet").then((m) => m.ReactionsSheet), { ssr: false });
+const ForwardSheet = dynamic(() => import("./dialogs").then((m) => m.ForwardSheet), { ssr: false });
+const DeleteDialog = dynamic(() => import("./dialogs").then((m) => m.DeleteDialog), { ssr: false });
+const ReportSheet = dynamic(() => import("./dialogs").then((m) => m.ReportSheet), { ssr: false });
+const ProfileSheet = dynamic(() => import("./dialogs").then((m) => m.ProfileSheet), { ssr: false });
+const PublicContactSheet = dynamic(() => import("@/components/contacts/public-contact-sheet").then((m) => m.PublicContactSheet), { ssr: false });
 
 const POLL_MS = 3_000;
 const PINNED_BAR = 44;
@@ -724,6 +729,15 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
     }
   }
 
+  const forwardMounted = useMountOnce(forwarding !== null);
+  const deleteMounted = useMountOnce(deleting !== null);
+  const reportMounted = useMountOnce(reporting !== null);
+  const reactionsMounted = useMountOnce(reactionsOf !== null);
+  const contactMounted = useMountOnce(contactCard !== null);
+  const searchMounted = useMountOnce(searchOpen);
+  const groupMounted = useMountOnce(groupOpen);
+  const profileMounted = useMountOnce(profileOpen);
+
   return (
     <ChatActionsContext value={actions}>
       <div className="relative h-full">
@@ -820,8 +834,9 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
         </div>
 
         <ActionMenu anchor={menu?.point ?? null} onClose={() => setMenu(null)} items={menuItems} header={reactionBar} label="Message actions" />
-        <ForwardSheet message={forwarding} onClose={() => setForwarding(null)} />
-        <DeleteDialog
+        {/* Each loads and mounts the first time it's opened (then stays, so it animates closed). */}
+        {forwardMounted && <ForwardSheet message={forwarding} onClose={() => setForwarding(null)} />}
+        {deleteMounted && <DeleteDialog
           message={deleting}
           mine={deleting?.senderId === me.id || (isGroup && isAdmin)}
           onClose={() => setDeleting(null)}
@@ -830,9 +845,9 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
               ? updateMessage(id, (m) => ({ ...m, deleted: true, text: null, attachments: [], reactions: [], linkPreview: null, pinnedAt: null }))
               : setS((x) => ({ ...x, confirmed: x.confirmed.filter((m) => m.id !== id) }))
           }
-        />
-        <ReportSheet target={reporting} onClose={() => setReporting(null)} />
-        <ReactionsSheet
+        />}
+        {reportMounted && <ReportSheet target={reporting} onClose={() => setReporting(null)} />}
+        {reactionsMounted && <ReactionsSheet
           message={reactionsOf ? (s.confirmed.find((m) => m.id === reactionsOf) ?? null) : null}
           meId={me.id}
           readOnly={readOnly}
@@ -840,13 +855,13 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
           avatarOf={avatarOf}
           onToggle={toggleReaction}
           onClose={() => setReactionsOf(null)}
-        />
-        <PublicContactSheet contact={contactCard} onClose={() => setContactCard(null)} onChange={setContactCard} />
-        <ChatSearch open={searchOpen} chatId={chatId} nameOf={nameOf} onClose={() => setSearchOpen(false)} onPick={(id) => {
+        />}
+        {contactMounted && <PublicContactSheet contact={contactCard} onClose={() => setContactCard(null)} onChange={setContactCard} />}
+        {searchMounted && <ChatSearch open={searchOpen} chatId={chatId} nameOf={nameOf} onClose={() => setSearchOpen(false)} onPick={(id) => {
           setSearchOpen(false);
           jumpTo(id);
-        }} />
-        {isGroup && (
+        }} />}
+        {isGroup && groupMounted && (
           <GroupInfoSheet
             open={groupOpen}
             onClose={() => setGroupOpen(false)}
@@ -857,7 +872,7 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
             onChanged={refreshMembers}
           />
         )}
-        {chat.peer && (
+        {chat.peer && profileMounted && (
           <ProfileSheet
             open={profileOpen}
             onClose={() => setProfileOpen(false)}

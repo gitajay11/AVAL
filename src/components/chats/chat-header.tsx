@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { IdleLink as Link } from "@/components/ui/idle-link";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { Bell, BellOff, ChevronLeft, Eye, Globe, Info, Lock, MoreHorizontal, Pin, Search, X } from "lucide-react";

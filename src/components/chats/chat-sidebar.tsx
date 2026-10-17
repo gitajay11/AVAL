@@ -1,13 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
+import { IdleLink as Link } from "@/components/ui/idle-link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { useLayoutEffect, useRef, useState } from "react";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { useRef, useState } from "react";
 import { Archive, Bell, BookUser, ChevronLeft, ChevronRight, MessageCircleMore, Search, SquarePen, Star, UserRound, UsersRound, X } from "lucide-react";
-import { PublicContactResults } from "@/components/contacts/public-contact-results";
 import { useNotifications } from "@/components/notifications/notifications-provider";
 import { useUser } from "@/components/app/user-context";
 import { InstallBanner } from "@/components/app/pwa-banners";
@@ -17,14 +15,16 @@ import { ActionMenu } from "@/components/ui/action-menu";
 import { Avatar } from "@/components/ui/avatar";
 import { FloatingBar } from "@/components/ui/floating-bar";
 import { cn } from "@/lib/cn";
-import type { ChatListItemDTO } from "@/lib/chats/types";
 import { useChats } from "./chat-store";
 import { ChatListItem } from "./chat-list-item";
-import { MessageResults } from "./message-results";
-import { PeopleResults } from "./people-results";
+import { useMountOnce } from "@/components/ui/idle-link";
 
 // Only needed once someone starts a group: fetched after the list is up.
 const NewGroupSheet = dynamic(() => import("./new-group").then((m) => m.NewGroupSheet), { ssr: false });
+// Search results load on the first search.
+const PeopleResults = dynamic(() => import("./people-results").then((m) => m.PeopleResults), { ssr: false });
+const PublicContactResults = dynamic(() => import("@/components/contacts/public-contact-results").then((m) => m.PublicContactResults), { ssr: false });
+const MessageResults = dynamic(() => import("./message-results").then((m) => m.MessageResults), { ssr: false });
 
 function ConnectionPill() {
   const { status } = useRealtime();
@@ -38,56 +38,9 @@ function ConnectionPill() {
 
 /** Past this many rows the list is virtualised (shorter lists keep their add/remove animations). */
 const VIRTUALIZE_AT = 60;
-const ROW = 70; // estimated row height incl. the 6px gap
 
-function VirtualChatList({ chats, meId, activeId, typing, scroller }: {
-  chats: ChatListItemDTO[];
-  meId: string;
-  activeId: string | null;
-  typing: Record<string, unknown>;
-  scroller: React.RefObject<HTMLDivElement | null>;
-}) {
-  const list = useRef<HTMLUListElement>(null);
-  const [margin, setMargin] = useState(0);
-  useLayoutEffect(() => {
-    const el = list.current;
-    if (!el) return;
-    const update = () => setMargin(el.offsetTop);
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el.parentElement!);
-    return () => ro.disconnect();
-  }, []);
-  // TanStack Virtual keeps its own mutable state, so the React Compiler skips this component.
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const v = useVirtualizer({
-    count: chats.length,
-    getScrollElement: () => scroller.current,
-    estimateSize: () => ROW,
-    getItemKey: (i) => chats[i].id,
-    overscan: 6,
-    gap: 6,
-    scrollMargin: margin,
-  });
-  return (
-    <ul ref={list} className="relative my-1.5" style={{ height: v.getTotalSize() }}>
-      {v.getVirtualItems().map((row) => {
-        const chat = chats[row.index];
-        return (
-          <ChatListItem
-            key={chat.id}
-            prefetchContent={row.index < 6}
-            chat={chat}
-            meId={meId}
-            active={chat.id === activeId}
-            typing={Boolean(typing[chat.id])}
-            virtual={{ index: row.index, start: row.start - margin, measure: v.measureElement }}
-          />
-        );
-      })}
-    </ul>
-  );
-}
+// Only long lists are virtualised; the virtualiser loads when one is.
+const VirtualChatList = dynamic(() => import("./virtual-chat-list").then((m) => m.VirtualChatList));
 
 export function ChatSidebar() {
   const me = useUser();
@@ -99,6 +52,7 @@ export function ChatSidebar() {
   const [compose, setCompose] = useState<{ x: number; y: number } | null>(null);
   const [newGroup, setNewGroup] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const newGroupMounted = useMountOnce(newGroup);
   const scroller = useRef<HTMLDivElement>(null);
   const activeId = pathname.startsWith("/chats/") ? pathname.split("/")[2] : null;
   const searching = query.trim().length > 0;
@@ -189,7 +143,7 @@ export function ChatSidebar() {
             { label: "New group", icon: UsersRound, onSelect: () => setNewGroup(true) },
           ]}
         />
-        <NewGroupSheet open={newGroup} onClose={() => setNewGroup(false)} />
+        {newGroupMounted && <NewGroupSheet open={newGroup} onClose={() => setNewGroup(false)} />}
         <label className="relative mt-3 block">
           <span className="sr-only">Search chats and people</span>
           <Search className="pointer-events-none absolute top-1/2 left-3.5 size-[18px] -translate-y-1/2 text-subtle" aria-hidden="true" />

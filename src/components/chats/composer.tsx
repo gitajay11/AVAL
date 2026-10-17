@@ -13,10 +13,11 @@ import { encodeImage, prepareFile, type PreparedMedia } from "@/lib/client/media
 import type { MessageDTO } from "@/lib/chats/types";
 import { formatBytes } from "@/lib/media/policy";
 import { MESSAGE_MAX } from "@/lib/validation/limits";
-import { EmojiPicker } from "./emoji-picker";
 import { snippetOf } from "./message-snippet";
 import { useVoiceRecorder } from "./use-voice-recorder";
+import { useMountOnce } from "@/components/ui/idle-link";
 
+const EmojiPicker = dynamic(() => import("./emoji-picker").then((m) => m.EmojiPicker), { ssr: false });
 // Only loaded once something is picked.
 const AttachmentGrid = dynamic(() => import("./attachment-grid").then((m) => m.AttachmentGrid), { ssr: false });
 // Only loaded once someone crops a photo.
@@ -91,6 +92,7 @@ export function Composer({ chatId, onSend, onTyping, replyTo, onCancelReply, edi
   const inputs = useRef<Record<string, HTMLInputElement | null>>({});
   const lastTyping = useRef(0);
   const voice = useVoiceRecorder();
+  const emojiMounted = useMountOnce(emojiOpen);
   // "hold": finger/mouse still down; "locked": hands-free with cancel + send.
   const [voiceMode, setVoiceMode] = useState<"hold" | "locked" | null>(null);
   const [drag, setDrag] = useState({ x: 0, y: 0 });
@@ -406,7 +408,7 @@ export function Composer({ chatId, onSend, onTyping, replyTo, onCancelReply, edi
         }}
         className="relative flex min-w-0 items-end gap-2"
       >
-        <EmojiPicker open={emojiOpen} onPick={insertEmoji} onClose={() => setEmojiOpen(false)} />
+        {emojiMounted && <EmojiPicker open={emojiOpen} onPick={insertEmoji} onClose={() => setEmojiOpen(false)} />}
         {inVoice ? (
           // The recording bar takes the input's place. Everything in it may shrink
           // (min-width: 0); the send button beside it never does.

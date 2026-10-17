@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { IdleLink as Link } from "@/components/ui/idle-link";
 import { useEffect, useState } from "react";
 import { Bell, ChevronLeft } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
