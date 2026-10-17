@@ -2,10 +2,10 @@
 
 import dynamic from "next/dynamic";
 import { IdleLink as Link } from "@/components/ui/idle-link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { useRef, useState } from "react";
-import { Archive, Bell, BookUser, ChevronLeft, ChevronRight, MessageCircleMore, Search, SquarePen, Star, UserRound, UsersRound, X } from "lucide-react";
+import { useRef, useState, useTransition } from "react";
+import { Archive, Bell, BookUser, ChevronLeft, ChevronRight, MessageCircleMore, RefreshCw, Search, SquarePen, Star, UserRound, UsersRound, X } from "lucide-react";
 import { useNotifications } from "@/components/notifications/notifications-provider";
 import { useUser } from "@/components/app/user-context";
 import { InstallBanner } from "@/components/app/pwa-banners";
@@ -14,6 +14,7 @@ import { useRealtime } from "@/components/realtime/realtime-provider";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { Avatar } from "@/components/ui/avatar";
 import { FloatingBar } from "@/components/ui/floating-bar";
+import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
 import { useChats } from "./chat-store";
 import { ChatListItem } from "./chat-list-item";
@@ -33,6 +34,51 @@ function ConnectionPill() {
     <span className="rounded-full bg-surface-3 px-2 py-0.5 text-xs font-semibold text-muted" role="status">
       Connecting…
     </span>
+  );
+}
+
+/** The spin lasts at least this long, so a quick refresh still reads as one. */
+const REFRESH_MIN_MS = 600;
+
+/**
+ * Pulls everything fresh from the server in place: the chat list, the
+ * notifications and the page's server data. No full reload, so the launch
+ * splash doesn't replay and nothing on screen is lost.
+ */
+function RefreshButton() {
+  const router = useRouter();
+  const toast = useToast();
+  const { refresh: refreshChats } = useChats();
+  const { refresh: refreshNotifications } = useNotifications();
+  const [loading, setLoading] = useState(false);
+  const [refreshing, startTransition] = useTransition();
+  const busy = loading || refreshing;
+
+  async function onClick() {
+    if (busy) return;
+    setLoading(true);
+    const minimum = new Promise((resolve) => setTimeout(resolve, REFRESH_MIN_MS));
+    try {
+      await Promise.all([refreshChats(), refreshNotifications(), minimum]);
+      startTransition(() => router.refresh());
+    } catch {
+      await minimum;
+      toast("Couldn't refresh. Check your connection.", "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-busy={busy}
+      className="grid size-9 place-items-center rounded-xl text-muted hover:bg-surface-3 hover:text-fg sm:size-10"
+      aria-label={busy ? "Refreshing" : "Refresh"}
+    >
+      <RefreshCw className={cn("size-5", busy && "motion-safe:animate-spin")} />
+    </button>
   );
 }
 
@@ -95,6 +141,7 @@ export function ChatSidebar() {
           <h1 className="floating-title flex min-w-0 flex-1 items-center gap-2 text-xl font-extrabold tracking-tight">
             {showArchived ? "Archived" : "Chats"} <ConnectionPill />
           </h1>
+          <RefreshButton />
           <Link
             href="/notifications"
             {...navProps("/notifications", "relative grid size-9 place-items-center rounded-xl text-muted hover:bg-surface-3 hover:text-fg sm:size-10")}
