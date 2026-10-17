@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
     <title>Offline · Aval</title>
-    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/icons/icon-192.png" type="image/png" />
     <style>
       :root {
         --bg: #eef6f4;
@@ -81,17 +81,8 @@
   </head>
   <body>
     <main>
-      <svg width="64" height="64" viewBox="0 0 48 48" aria-hidden="true">
-        <defs>
-          <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stop-color="#1d4ed8" />
-            <stop offset="1" stop-color="#0f766e" />
-          </linearGradient>
-        </defs>
-        <rect width="48" height="48" rx="15" fill="url(#g)" />
-        <path d="M14 31.5c0-7.5 4.6-15 10-15s10 7.5 10 15M18.5 26h11" stroke="#fff" stroke-width="3.4" stroke-linecap="round" fill="none" />
-        <circle cx="34.5" cy="33" r="3" fill="#6ee7b7" />
-      </svg>
+      <!-- Precached by the service worker, so it shows offline. -->
+      <img src="/icons/logo-256.webp" width="64" height="64" alt="" style="border-radius: 9999px" />
       <h1>You're offline</h1>
       <p>Aval keeps your chats in the cloud, not on this device, so it needs a connection to show them.</p>
       <button type="button" id="retry">Try again</button>

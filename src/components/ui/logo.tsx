@@ -1,31 +1,28 @@
 import { cn } from "@/lib/cn";
 
+/** The brand logo (public/icons/logo-*.webp, generated from logo/ by `pnpm icons`). */
 export function LogoMark({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 48 48" className={cn("size-10", className)} aria-hidden="true">
-      <defs>
-        <linearGradient id="aval-g" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#1d4ed8" />
-          <stop offset="1" stopColor="#0f766e" />
-        </linearGradient>
-      </defs>
-      <rect width="48" height="48" rx="15" fill="url(#aval-g)" />
-      <path
-        d="M14 31.5c0-7.5 4.6-15 10-15s10 7.5 10 15M18.5 26h11"
-        stroke="#fff"
-        strokeWidth="3.4"
-        strokeLinecap="round"
-        fill="none"
-      />
-      <circle cx="34.5" cy="33" r="3" fill="#6ee7b7" />
-    </svg>
+    // A static brand image: next/image adds nothing here.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/icons/logo-256.webp"
+      srcSet="/icons/logo-256.webp 256w, /icons/logo-512.webp 512w"
+      sizes="128px"
+      alt=""
+      aria-hidden="true"
+      width={256}
+      height={256}
+      draggable={false}
+      className={cn("size-10 shrink-0 rounded-full select-none", className)}
+    />
   );
 }
 
 export function Logo({ className }: { className?: string }) {
   return (
     <span className={cn("inline-flex items-center gap-2.5", className)}>
-      <LogoMark className="size-9" />
+      <LogoMark className="size-10" />
       <span className="text-[22px] font-extrabold tracking-tight text-fg">Aval</span>
     </span>
   );
