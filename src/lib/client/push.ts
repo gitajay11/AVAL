@@ -1,6 +1,7 @@
 "use client";
 
 import { api, ClientApiError } from "./api";
+import { APP_VERSION } from "@/lib/version";
 
 export type PushState = "unsupported" | "unconfigured" | "denied" | "off" | "on" | "needs-install";
 
@@ -16,7 +17,7 @@ const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent);
 const isStandalone = () => window.matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;
 
 /** One worker per build (its app-shell cache is per build too). */
-const SW_URL = `/sw.js?v=${encodeURIComponent(process.env.NEXT_PUBLIC_BUILD_ID ?? "dev")}`;
+const SW_URL = `/sw.js?v=${encodeURIComponent(process.env.NEXT_PUBLIC_BUILD_ID ?? "dev")}&app=${encodeURIComponent(APP_VERSION)}`;
 
 /** The app's service worker registration. Registering the same URL again is a no-op; a new build's URL updates it. */
 export async function registration(): Promise<ServiceWorkerRegistration | null> {

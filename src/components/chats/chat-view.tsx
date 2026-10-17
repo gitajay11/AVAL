@@ -35,6 +35,7 @@ const ForwardSheet = dynamic(() => import("./dialogs").then((m) => m.ForwardShee
 const DeleteDialog = dynamic(() => import("./dialogs").then((m) => m.DeleteDialog), { ssr: false });
 const ReportSheet = dynamic(() => import("./dialogs").then((m) => m.ReportSheet), { ssr: false });
 const ProfileSheet = dynamic(() => import("./dialogs").then((m) => m.ProfileSheet), { ssr: false });
+const MemberSheet = dynamic(() => import("./member-sheet").then((m) => m.MemberSheet), { ssr: false });
 const PublicContactSheet = dynamic(() => import("@/components/contacts/public-contact-sheet").then((m) => m.PublicContactSheet), { ssr: false });
 
 const POLL_MS = 3_000;
@@ -117,6 +118,7 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [reactionsOf, setReactionsOf] = useState<string | null>(null);
+  const [memberCard, setMemberCard] = useState<string | null>(null);
   const [groupOpen, setGroupOpen] = useState(false);
   const isGroup = chat.type === "GROUP";
   const [members, setMembers] = useState<MemberDTO[]>(detail.members ?? []);
@@ -572,9 +574,11 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
       openMenu: (m, point) => !readOnly && setMenu({ message: m, point, openedAt: Date.now() }),
       toggleReaction: (m, emoji) => !readOnly && toggleReaction(m, emoji),
       showReactions: (m) => setReactionsOf(m.id),
+      showMember: (userId) => setMemberCard(userId),
+      usernameOf: (userId) => members.find((x) => x.id === userId)?.username ?? null,
       jumpTo,
     }),
-    [avatarOf, canSend, isGroup, jumpTo, me.id, nameOf, readOnly, retry, toggleReaction],
+    [avatarOf, canSend, isGroup, jumpTo, me.id, members, nameOf, readOnly, retry, toggleReaction],
   );
 
   const receiptFor = useCallback(
@@ -737,6 +741,7 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
   const searchMounted = useMountOnce(searchOpen);
   const groupMounted = useMountOnce(groupOpen);
   const profileMounted = useMountOnce(profileOpen);
+  const memberMounted = useMountOnce(memberCard !== null);
 
   return (
     <ChatActionsContext value={actions}>
@@ -857,6 +862,13 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
           onClose={() => setReactionsOf(null)}
         />}
         {contactMounted && <PublicContactSheet contact={contactCard} onClose={() => setContactCard(null)} onChange={setContactCard} />}
+        {memberMounted && (
+          <MemberSheet
+            member={memberCard ? (members.find((x) => x.id === memberCard) ?? null) : null}
+            meId={me.id}
+            onClose={() => setMemberCard(null)}
+          />
+        )}
         {searchMounted && <ChatSearch open={searchOpen} chatId={chatId} nameOf={nameOf} onClose={() => setSearchOpen(false)} onPick={(id) => {
           setSearchOpen(false);
           jumpTo(id);

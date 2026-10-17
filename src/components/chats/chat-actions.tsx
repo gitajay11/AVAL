@@ -18,6 +18,10 @@ export type ChatActions = {
   toggleReaction: (m: MessageDTO, emoji: string) => void;
   /** Who reacted to this message. */
   showReactions: (m: MessageDTO) => void;
+  /** A group member's card (their avatar beside a message, when they have no photo). */
+  showMember: (userId: string) => void;
+  /** A member's @username, for the photo viewer. */
+  usernameOf: (userId: string | null) => string | null;
   jumpTo: (messageId: string) => void;
 };
 
