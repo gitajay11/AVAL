@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { Avatar } from "./avatar";
 
-type Open = { el: HTMLElement; src: string; name: string };
+type Open = { el: HTMLElement; src: string; name: string; /** Shown under the name. */ username?: string | null };
 const ViewerContext = createContext<(o: Open) => void>(() => {});
 
 /** The 1080px copy of an avatar served by our media routes (falls back to the small one). */
@@ -39,19 +39,19 @@ export function useAvatarViewer() {
 }
 
 /** An avatar that opens the viewer when it has a photo. */
-export function ViewableAvatar({ name, src, size, className }: { name: string; src: string | null; size: number; className?: string }) {
+export function ViewableAvatar({ name, src, size, className, username }: { name: string; src: string | null; size: number; className?: string; username?: string | null }) {
   const view = useAvatarViewer();
   if (!src) return <Avatar name={name} src={null} size={size} className={className} />;
   return (
-    <button type="button" onClick={(e) => view({ el: e.currentTarget, src, name })} className="rounded-full" aria-label={`View ${name}'s photo`}>
+    <button type="button" onClick={(e) => view({ el: e.currentTarget, src, name, username })} className="rounded-full" aria-label={`View ${name}'s photo`}>
       <Avatar name={name} src={src} size={size} className={className} />
     </button>
   );
 }
 
-function Viewer({ el, src, name, onClose }: Open & { onClose: () => void }) {
+function Viewer({ el, src, name, username, onClose }: Open & { onClose: () => void }) {
   const reduce = useReducedMotion();
-  const [shown, setShown] = useState(src);
+  const [full, setFull] = useState<"loading" | "ready" | "failed">("loading");
   const [vw, setVw] = useState(() => window.innerWidth);
   const [vh, setVh] = useState(() => window.innerHeight);
   const side = Math.min(vw, vh) - 32;
@@ -73,16 +73,6 @@ function Viewer({ el, src, name, onClose }: Open & { onClose: () => void }) {
   const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
   const closeBtn = useRef<HTMLButtonElement>(null);
 
-  // Swap in the large copy once it has decoded (the small one shows meanwhile).
-  useEffect(() => {
-    const img = new Image();
-    img.src = fullUrl(src);
-    let live = true;
-    img.decode().then(() => live && setShown(img.src), () => {});
-    return () => {
-      live = false;
-    };
-  }, [src]);
 
   useEffect(() => {
     closeBtn.current?.focus();
@@ -196,7 +186,10 @@ function Viewer({ el, src, name, onClose }: Open & { onClose: () => void }) {
         onClick={onClose}
       />
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center gap-3 px-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <p className="min-w-0 flex-1 truncate text-[17px] font-semibold text-white drop-shadow">{name}</p>
+        <div className="min-w-0 flex-1 drop-shadow">
+          <p className="truncate text-[17px] font-semibold text-white">{name}</p>
+          {username && <p className="truncate text-[13px] text-white/75">@{username}</p>}
+        </div>
         <button
           ref={closeBtn}
           type="button"
@@ -220,13 +213,25 @@ function Viewer({ el, src, name, onClose }: Open & { onClose: () => void }) {
         onPointerCancel={onUp}
         onWheel={(e) => setZoom(Math.max(1, Math.min(MAX_ZOOM, zoom.get() * (e.deltaY < 0 ? 1.25 : 0.8))), local(e as unknown as React.PointerEvent))}
       >
-        <motion.img
-          src={shown}
-          alt={name}
-          draggable={false}
-          className="size-full object-cover"
-          style={{ scale: zoom, x: panX, y: panY }}
-        />
+        {/* The 1080px copy loads straight away; the small avatar (already in the
+            cache) holds its place for the zoom-in until the large one paints. */}
+        <motion.div className="relative size-full" style={{ scale: zoom, x: panX, y: panY }}>
+          {full !== "ready" && (
+            // eslint-disable-next-line @next/next/no-img-element -- signed per-viewer media URL
+            <img src={src} alt="" aria-hidden="true" draggable={false} className="absolute inset-0 size-full object-contain" />
+          )}
+          {full !== "failed" && (
+            // eslint-disable-next-line @next/next/no-img-element -- signed per-viewer media URL
+            <img
+              src={fullUrl(src)}
+              alt={name}
+              draggable={false}
+              onLoad={() => setFull("ready")}
+              onError={() => setFull("failed")}
+              className="relative size-full object-contain"
+            />
+          )}
+        </motion.div>
       </motion.div>
     </motion.div>
   );

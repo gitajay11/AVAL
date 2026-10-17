@@ -1,6 +1,12 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV !== "production";
+
+// The app version (package.json), shown as "AVAL 1.0" and part of the service
+// worker's cache name, so a new version starts with a fresh cache.
+const appVersion: string = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf8")).version;
 
 // Identifies this build. The service worker is registered as /sw.js?v=<id>, so
 // every deploy installs a fresh worker with its own app-shell cache, and open
@@ -48,7 +54,7 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   poweredByHeader: false,
-  env: { NEXT_PUBLIC_BUILD_ID: buildId },
+  env: { NEXT_PUBLIC_BUILD_ID: buildId, NEXT_PUBLIC_APP_VERSION: appVersion },
   experimental: {
     // Soft navigations wait for the network to return instead of failing, and
     // useOffline() drives the offline banner.

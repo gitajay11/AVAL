@@ -272,7 +272,7 @@ export function ProfileSheet({
   return (
     <Sheet open={open} onClose={onClose} title="Profile">
       <div className="flex flex-col items-center gap-2 pt-1 pb-4 text-center">
-        <ViewableAvatar name={chat.title} src={p?.avatarUrl ?? chat.avatarUrl} size={96} />
+        <ViewableAvatar name={chat.title} src={p?.avatarUrl ?? chat.avatarUrl} username={chat.peer?.username} size={96} />
         <p className="mt-1 text-xl font-bold">{p ? (p.alias ?? p.displayName) : chat.title}</p>
         {p?.alias ? (
           <p className="text-[14px] text-muted">

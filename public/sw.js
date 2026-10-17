@@ -5,12 +5,15 @@
  * media are never intercepted or stored, so no message, chat, contact or user
  * data ever lands in Cache Storage. Sign-out deletes every cache.
  *
- * Registered as /sw.js?v=<build id>: each deploy is a new worker with its own
- * cache, and the previous build's cache is deleted when it activates.
+ * Registered as /sw.js?v=<build id>&app=<app version>: each deploy (and each app
+ * version) is a new worker with its own cache, and the previous one's cache is
+ * deleted when it activates.
  */
 
-const VERSION = new URL(self.location.href).searchParams.get("v") || "dev";
-const SHELL = `aval-shell-${VERSION}`;
+const PARAMS = new URL(self.location.href).searchParams;
+const VERSION = PARAMS.get("v") || "dev";
+const APP_VERSION = PARAMS.get("app") || "0";
+const SHELL = `aval-${APP_VERSION}-shell-${VERSION}`;
 // In development the build assets aren't content-hashed, so nothing is cached.
 const CACHING = VERSION !== "dev";
 const OFFLINE_URL = "/offline.html";

@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
+import { APP_LABEL } from "@/lib/version";
 
 /** Glass card with a gentle spring entrance, shared by every auth screen. */
 export function AuthCard({
@@ -26,6 +27,7 @@ export function AuthCard({
         <div className="mt-6">{children}</div>
       </section>
       {footer && <div className="mt-5 text-center text-[15px] text-muted">{footer}</div>}
+      <p className="mt-6 text-center text-xs text-subtle">{APP_LABEL}</p>
     </motion.div>
   );
 }

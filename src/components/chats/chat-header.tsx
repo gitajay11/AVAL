@@ -7,11 +7,12 @@ import { Bell, BellOff, ChevronLeft, Eye, Globe, Info, Lock, MoreHorizontal, Pin
 import { ActionMenu } from "@/components/ui/action-menu";
 import { Avatar } from "@/components/ui/avatar";
 import { formatLastSeen, useMinute } from "@/lib/client/time";
-import type { ChatListItemDTO, MessageDTO } from "@/lib/chats/types";
+import type { ChatListItemDTO, MessageDTO, PresenceDTO } from "@/lib/chats/types";
 import { useChats, useTyping } from "./chat-store";
 import { snippetOf } from "./message-snippet";
 import { TypingDots } from "./typing-dots";
 import { usePresence } from "./use-presence";
+import { useAvatarViewer } from "@/components/ui/avatar-viewer";
 
 /** Journals and shared contacts have no presence: say what the chat is instead. */
 function ContactLine({ chat, readOnly }: { chat: ChatListItemDTO; readOnly: boolean }) {
@@ -41,9 +42,8 @@ function GroupLine({ chat, nameOf }: { chat: ChatListItemDTO; nameOf: (id: strin
   );
 }
 
-function StatusLine({ chat }: { chat: ChatListItemDTO }) {
+function StatusLine({ chat, presence }: { chat: ChatListItemDTO; presence: PresenceDTO | null }) {
   const typingUser = useTyping(chat.id);
-  const presence = usePresence(chat.peer?.id ?? null);
   useMinute(); // keep "x min ago" fresh
 
   let key: string;
@@ -99,11 +99,15 @@ type HeaderProps = {
 
 /**
  * Floating glass capsule over the messages (they scroll underneath it): back,
- * squircle avatar, name and status, search and a "⋯" menu. The pinned message
+ * round avatar (tap for the photo), name and status, search and a "⋯" menu. The pinned message
  * folds out of the same capsule.
  */
 export function ChatHeader({ chat, readOnly, nameOf, onSearch, pinned, onOpenProfile, onJumpToPinned, onUnpin }: HeaderProps) {
   const { updateSettings } = useChats();
+  const viewPhoto = useAvatarViewer();
+  // One presence subscription for the status line and the online dot (1:1 chats only).
+  const presence = usePresence(chat.type === "DIRECT" ? (chat.peer?.id ?? null) : null);
+  const online = Boolean(presence?.visible && presence.online);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const infoLabel = chat.type === "GROUP" ? "Group info" : chat.contact ? (readOnly ? "About" : "Manage contact") : "View profile";
 
@@ -117,13 +121,28 @@ export function ChatHeader({ chat, readOnly, nameOf, onSearch, pinned, onOpenPro
         >
           <ChevronLeft className="size-6" />
         </Link>
+        {/* The photo opens full screen; without one, the profile. */}
+        <button
+          type="button"
+          onClick={(e) =>
+            chat.avatarUrl ? viewPhoto({ el: e.currentTarget, src: chat.avatarUrl, name: chat.title, username: chat.peer?.username }) : onOpenProfile()
+          }
+          className="relative ml-0.5 shrink-0 rounded-full transition-transform active:scale-95"
+          aria-label={chat.avatarUrl ? `View ${chat.title}'s photo` : chat.type === "GROUP" ? `${chat.title} info` : `${chat.title}'s profile`}
+        >
+          <span className="block rounded-full bg-gradient-to-br from-[var(--jade)] to-[var(--ocean)] p-[2px]">
+            <Avatar name={chat.title} src={chat.avatarUrl} size={36} className="ring-[1.5px] ring-[var(--bg)]" />
+          </span>
+          {online && (
+            <span className="absolute right-0 bottom-0 size-3 rounded-full bg-[var(--mint)] ring-2 ring-[var(--bg)]" aria-hidden="true" />
+          )}
+        </button>
         <button
           type="button"
           onClick={onOpenProfile}
-          className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl py-1 pr-2 pl-1 text-left hover:bg-surface-3/60"
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl py-1 pr-2 pl-1.5 text-left hover:bg-surface-3/60"
         >
           <span className="sr-only">{chat.type === "GROUP" ? "Group info: " : chat.contact ? (readOnly ? "About: " : "Manage contact: ") : "Profile: "}</span>
-          <Avatar name={chat.title} src={chat.avatarUrl} size={42} shape="squircle" />
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-1.5">
               <span className="truncate text-[16px] leading-tight font-bold">{chat.title}</span>
@@ -134,7 +153,7 @@ export function ChatHeader({ chat, readOnly, nameOf, onSearch, pinned, onOpenPro
             ) : chat.contact ? (
               <ContactLine chat={chat} readOnly={readOnly} />
             ) : (
-              <StatusLine chat={chat} />
+              <StatusLine chat={chat} presence={presence} />
             )}
           </span>
         </button>

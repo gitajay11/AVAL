@@ -4,8 +4,8 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "Aval",
-    short_name: "Aval",
+    name: "AVAL",
+    short_name: "AVAL",
     description: "Fast, private messaging.",
     start_url: "/chats",
     scope: "/",

@@ -4,7 +4,7 @@ import { IdleLink as Link } from "@/components/ui/idle-link";
 import { useState } from "react";
 import { ChevronLeft } from "lucide-react";
 import type { Me } from "@/lib/users";
-import { AppSection } from "./app-section";
+import { AboutSection, AppSection } from "./app-section";
 import { BlockedSection } from "./blocked-section";
 import { AppearanceSection, PrivacyAndNotifications } from "./preferences-sections";
 import { ProfileSection } from "./profile-section";
@@ -32,6 +32,7 @@ export function SettingsView({ me: initial }: { me: Me }) {
         <AppearanceSection />
         <AppSection />
         <AccountSection me={me} />
+        <AboutSection />
       </div>
     </div>
   );

@@ -12,6 +12,7 @@ import { useChatActions } from "./chat-actions";
 import { Attachments, LinkPreviewCard } from "./media/attachments";
 import { snippetOf } from "./message-snippet";
 import { MessageText } from "./message-text";
+import { useAvatarViewer } from "@/components/ui/avatar-viewer";
 
 /** "none": journals (personal contacts) have nobody to deliver to. */
 export type Receipt = "sending" | "failed" | "sent" | "delivered" | "read" | "none";
@@ -67,6 +68,24 @@ const NAME_COLORS = [
   "text-[#15803d] dark:text-[#4ade80]",
 ];
 const nameColor = (id: string) => NAME_COLORS[([...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0) >>> 0) % NAME_COLORS.length];
+
+/** Beside a group message: tap for the sender's photo, or their card when there's none. */
+function SenderAvatar({ userId }: { userId: string }) {
+  const actions = useChatActions();
+  const viewPhoto = useAvatarViewer();
+  const name = actions.nameOf(userId);
+  const src = actions.avatarOf(userId);
+  return (
+    <button
+      type="button"
+      onClick={(e) => (src ? viewPhoto({ el: e.currentTarget, src, name, username: actions.usernameOf(userId) }) : actions.showMember(userId))}
+      className="block rounded-full transition-transform active:scale-95"
+      aria-label={src ? `View ${name}'s photo` : `${name}'s profile`}
+    >
+      <Avatar name={name} src={src} size={32} />
+    </button>
+  );
+}
 
 export const MessageBubble = memo(function MessageBubble(props: Props) {
   if (props.message.type === "SYSTEM") return <SystemLine message={props.message} />;
@@ -204,7 +223,7 @@ function Bubble({ message, mine, groupStart, groupEnd, animate: animateIn, recei
       >
         {showPeople && (
           <span className="w-8 shrink-0 self-end">
-            {groupEnd && <Avatar name={actions.nameOf(message.senderId)} src={actions.avatarOf(message.senderId)} size={32} />}
+            {groupEnd && message.senderId && <SenderAvatar userId={message.senderId} />}
           </span>
         )}
         <div className={cn("relative min-w-0", stackHeight > 0 && "self-center")}>
