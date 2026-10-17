@@ -167,6 +167,8 @@ export type RealtimeEvent =
   | { name: "typing"; data: { chatId: string; userId: string } }
   | { name: "presence"; data: { userId: string; presence: PresenceDTO } }
   | { name: "notification.new"; data: { notification: NotificationDTO } }
-  | { name: "contact.access"; data: { contactId: string; chatId: string; access: "granted" | "revoked" } };
+  | { name: "contact.access"; data: { contactId: string; chatId: string; access: "granted" | "revoked" } }
+  /** Someone's photo, name or photo privacy changed: refetch whatever shows them. */
+  | { name: "user.updated"; data: { userId: string } };
 
 export type RealtimeEventName = RealtimeEvent["name"];

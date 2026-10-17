@@ -2,6 +2,7 @@ import { json, parseJson, route } from "@/lib/api";
 import { requireSession } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { rateLimit } from "@/lib/security/rate-limit";
+import { profileChanged } from "@/lib/profile-events";
 import { meSelect, toMe } from "@/lib/users";
 import { UpdateProfileSchema } from "@/lib/validation/profile";
 
@@ -27,5 +28,6 @@ export const PATCH = route(async (req) => {
     },
     select: meSelect,
   });
+  if (input.displayName !== undefined) await profileChanged(user.id);
   return json({ user: toMe(row) });
 });

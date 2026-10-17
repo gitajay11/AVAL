@@ -6,6 +6,7 @@ import { groupPhotoChanged, requireGroupAdmin } from "@/lib/groups/service";
 import { db } from "@/lib/db";
 import { sniffMime } from "@/lib/media/sniff";
 import { deleteObject, fullAvatarKey, headObject, readHead, UPLOAD_URL_TTL_SECONDS } from "@/lib/object-storage";
+import { profileChanged } from "@/lib/profile-events";
 import { meSelect, toMe } from "@/lib/users";
 import { AVATAR_MAX_BYTES, ConfirmUploadSchema } from "@/lib/validation/profile";
 
@@ -77,6 +78,7 @@ export const POST = route(async (req) => {
     ...(previous.avatarKey ? [db.attachment.deleteMany({ where: { objectKey: previous.avatarKey } })] : []),
   ]);
   if (previous.avatarKey) await deleteObject(previous.avatarKey);
+  await profileChanged(user.id);
 
   return json({ user: toMe(row) });
 });
