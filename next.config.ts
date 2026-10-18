@@ -59,6 +59,10 @@ const nextConfig: NextConfig = {
     // Soft navigations wait for the network to return instead of failing, and
     // useOffline() drives the offline banner.
     useOffline: true,
+    // Every production build starts from scratch. With the cache Vercel restores
+    // between builds, a build once shipped a stale globals.css (via the Tailwind
+    // loader) without the app-shell rules; scripts/check-build.mjs guards it too.
+    turbopackFileSystemCacheForBuild: false,
   },
   turbopack: {
     rules: {
