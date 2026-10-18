@@ -5,7 +5,7 @@ import { directChat, graceContext, realtimeAvailable, setProfilePhoto, waitForRe
 // and still after reloading. With real-time the change arrives in about a second;
 // without it (no Ably key), the app's polling fallback picks it up.
 
-test("a new profile photo shows for the other person, live and after a reload", async ({ browser, page, baseURL, viewport }) => {
+test("a new profile photo shows for the other person, live and after a reload", async ({ browser, context, page, baseURL, viewport }) => {
   const grace = await graceContext(browser, { viewport });
   const chatId = await directChat(grace.request, baseURL!);
 
@@ -31,8 +31,12 @@ test("a new profile photo shows for the other person, live and after a reload", 
   await expect(page.locator("header img").first()).toHaveAttribute("src", newUrl);
   await page.getByRole("link", { name: "Back to chats" }).click();
   await expect(row.locator("img")).toHaveAttribute("src", newUrl);
-  await page.reload();
-  await expect(row.locator("img")).toHaveAttribute("src", newUrl);
+
+  // And when the app is opened again (a fresh tab, same signed-in browser).
+  const reopened = await context.newPage();
+  await reopened.goto("/chats");
+  await expect(reopened.locator(`a[href="/chats/${chatId}"] img`)).toHaveAttribute("src", newUrl);
+  await reopened.close();
 
   await grace.close();
 });
