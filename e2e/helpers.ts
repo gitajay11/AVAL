@@ -70,7 +70,8 @@ export async function graceContext(browser: Browser, device: { viewport: { width
 export async function realtimeAvailable(request: APIRequestContext): Promise<boolean> {
   const status = (await request.get("/api/realtime/token")).status();
   expect(status, "signed in for the real-time check").not.toBe(401);
-  return status !== 503;
+  // 503: not configured. 429 (rate-limited) also leaves the app polling.
+  return status === 200;
 }
 
 /** Waits until this page's real-time connection is up (when the app has real-time). */

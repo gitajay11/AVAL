@@ -29,7 +29,9 @@ test("a new profile photo shows for the other person, live and after a reload", 
   // And after a reload (nothing stale is cached).
   await page.reload();
   await expect(page.locator("header img").first()).toHaveAttribute("src", newUrl);
-  await page.goto("/chats");
+  await page.getByRole("link", { name: "Back to chats" }).click();
+  await expect(row.locator("img")).toHaveAttribute("src", newUrl);
+  await page.reload();
   await expect(row.locator("img")).toHaveAttribute("src", newUrl);
 
   await grace.close();

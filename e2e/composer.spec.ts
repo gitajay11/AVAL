@@ -82,7 +82,7 @@ test("stays on screen after sending, and the message shows", async ({ page }) =>
   const text = `Composer check ${Date.now()}`;
   await page.locator("textarea").fill(text);
   await page.getByRole("button", { name: "Send", exact: true }).click();
-  await expect(page.getByText(text)).toBeVisible();
+  await expect(page.locator(".chat-fade").getByText(text)).toBeVisible();
   await expect(page.locator("textarea")).toHaveValue("");
   await expectComposerOnScreen(page);
 });
@@ -100,5 +100,6 @@ test("a several-line message keeps the latest messages in view", async ({ page }
   await page.locator("textarea").fill("one\ntwo\nthree\nfour\nfive");
   await expectComposerOnScreen(page);
   const fromEnd = await list.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight);
-  expect(fromEnd).toBeLessThanOrEqual(2);
+  // Within a few pixels of the end (sub-pixel row heights differ per engine).
+  expect(fromEnd).toBeLessThanOrEqual(8);
 });
