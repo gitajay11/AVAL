@@ -717,7 +717,7 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
     markRead(chatId, lastIncoming.createdAt);
   }, [atBottom, visible, readOnly, s.confirmed, me.id, chatId, markRead, chat.unread, chat.markedUnread, detail.myLastReadAt]);
 
-  // Keep the list's bottom padding equal to the composer's height.
+  // The composer's height: where the list opens and where "scroll to bottom" floats.
   useEffect(() => {
     const el = footer.current;
     if (!el) return;
@@ -749,7 +749,9 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
 
   return (
     <ChatActionsContext value={actions}>
-      <div className="relative h-full">
+      {/* A fixed column: the composer is in the flow under the list (never
+          absolutely placed), so nothing can scroll or cover it away. */}
+      <div className="relative flex h-full flex-col">
         <ChatHeader
           chat={chat}
           readOnly={readOnly}
@@ -768,6 +770,7 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
           onUnpin={() => pinned && (!isGroup || isAdmin) && setPin(pinned, false)}
         />
 
+        <div className="relative min-h-0 flex-1">
         <MessageList
           key={view.key}
           ref={list}
@@ -786,6 +789,7 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
           loadingNewer={s.loadingNewer}
           onAtBottomChange={onAtBottomChange}
         />
+        </div>
 
         <AnimatePresence>
           {(!atBottom || s.newerCursor !== null) && (
@@ -810,7 +814,7 @@ export function ChatView({ detail }: { detail: ChatDetailDTO }) {
           )}
         </AnimatePresence>
 
-        <div ref={footer} className="absolute inset-x-0 bottom-0 z-20 px-2 pt-2 pb-[max(0.625rem,env(safe-area-inset-bottom))] sm:px-4">
+        <div ref={footer} data-testid="composer-bar" className="relative z-20 shrink-0 px-2 pt-2 pb-[max(0.625rem,env(safe-area-inset-bottom))] sm:px-4">
           {canSend ? (
             <Composer
               chatId={chatId}

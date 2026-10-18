@@ -2,7 +2,7 @@ import "server-only";
 import { Ratelimit, type Duration } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { ApiError } from "@/lib/api";
-import { env } from "@/lib/env";
+import { env, IS_PROD } from "@/lib/env";
 
 type Rule = { limit: number; window: Duration };
 
@@ -76,8 +76,15 @@ function memoryLimit(name: RuleName, key: string): number {
   return 0;
 }
 
+/**
+ * End-to-end test runs (playwright.config.ts, .github/workflows/e2e.yml) sign in,
+ * reload and reconnect far more often than a person does. Ignored in production.
+ */
+const testRunWithoutLimits = !IS_PROD && process.env.E2E_NO_RATE_LIMITS === "1";
+
 /** Throws 429 when `key` has exhausted the budget for `name`. */
 export async function rateLimit(name: RuleName, key: string): Promise<void> {
+  if (testRunWithoutLimits) return;
   const map = getLimiters();
   let ok: boolean;
   let retryAfter = 60;

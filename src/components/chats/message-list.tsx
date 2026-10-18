@@ -1,7 +1,7 @@
 "use client";
 
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { forwardRef, memo, useCallback, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
+import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import { ClientTime, formatDay } from "@/lib/client/time";
 import type { TimelineItem, UiMessage } from "@/lib/chats/timeline";
@@ -55,6 +55,7 @@ type Props = {
   meId: string;
   loadingOlder: boolean;
   reachedStart: boolean;
+  /** The composer's height, under the list: the scroller is the window minus this. */
   footerHeight: number;
   highlightedId: string | null;
   headerExtra: number;
@@ -171,6 +172,20 @@ export const MessageList = forwardRef<MessageListHandle, Props>(function Message
     [onAtBottomChange, onStartReached, onEndReached],
   );
 
+  // The list gets shorter when the keyboard opens, the composer grows or the
+  // phone turns: if you were reading the latest messages, keep them in view.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    let height = el.clientHeight;
+    const ro = new ResizeObserver(() => {
+      if (el.clientHeight !== height && atBottom.current) el.scrollTop = el.scrollHeight;
+      height = el.clientHeight;
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   useLayoutEffect(() => {
     if (items.length === lastCount.current) return;
     lastCount.current = items.length;
@@ -253,7 +268,7 @@ export const MessageList = forwardRef<MessageListHandle, Props>(function Message
             );
           })}
         </div>
-        <div style={{ height: footerHeight + 8 }} className="flex justify-center pt-2">
+        <div className="flex min-h-2 justify-center pt-2">
           {loadingNewer && <Spinner className="size-5 text-subtle" />}
         </div>
       </div>

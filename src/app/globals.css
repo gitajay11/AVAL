@@ -418,6 +418,30 @@
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath fill-rule='evenodd' fill='rgba(0,0,0,0.5)' d='M0 0H100V100H0Z M50 0C88 0 100 12 100 50s-12 50-50 50S0 88 0 50 12 0 50 0z'/%3E%3Cpath fill='none' stroke='rgba(255,255,255,0.7)' stroke-width='0.6' d='M50 0.3C87.8 0.3 99.7 12.2 99.7 50S87.8 99.7 50 99.7 0.3 87.8 0.3 50 12.2 0.3 50 0.3z'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
 }
 
+/* The signed-in app is a fixed screen (components/app/app-shell.tsx): the page
+   never scrolls or bounces, only the lists inside it do, so the chat header and
+   composer can't be scrolled, pushed or panned away. Sized to the visible
+   screen: the visual viewport once scripts run (use-visual-viewport.ts:
+   on iOS the keyboard shrinks only that), else 100dvh, else 100vh. */
+html:has(.app-shell),
+html:has(.app-shell) body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+.app-shell {
+  position: fixed;
+  inset-inline: 0;
+  top: 0;
+  height: 100vh;
+  height: 100dvh;
+  overflow: clip;
+}
+:root[data-vv] .app-shell {
+  top: var(--vv-top);
+  height: var(--vv-height);
+}
+
 /* Launch splash (app/layout.tsx; dismissed by components/app/launch-splash.tsx).
    The brand background in every theme, matching the OS splash (manifest
    background_color, iOS startup images) so the hand-off is seamless; the logo

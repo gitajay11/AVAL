@@ -26,7 +26,7 @@ const ImageCropper = dynamic(() => import("@/components/ui/image-cropper").then(
 // Unsent drafts survive switching chats, in memory only (never stored on the device).
 const drafts = new Map<string, string>();
 
-const TYPING_EVERY_MS = 3_000;
+const TYPING_EVERY_MS = 2_000;
 const MAX_ITEMS = 10;
 /** Voice: drag this far left to cancel, this far up to lock; a press shorter than TAP_MS locks too. */
 const CANCEL_PX = 110;
