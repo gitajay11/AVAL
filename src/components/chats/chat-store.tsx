@@ -130,7 +130,7 @@ export function useTyping(chatId: string): string | null {
   return typing[chatId]?.userId ?? null;
 }
 
-const TYPING_SHOW_MS = 5_000;
+const TYPING_SHOW_MS = 4_000;
 const POLL_LIST_MS = 10_000;
 const DELIVERED_DEBOUNCE_MS = 800;
 

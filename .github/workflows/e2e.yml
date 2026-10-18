@@ -1,0 +1,93 @@
+# Unit tests, lint, typecheck and the Playwright end-to-end tests (e2e/) on every
+# pull request and every push to main. Vercel deploys main to production, so make
+# the "e2e" check required before merging into main (repo Settings → Branches →
+# branch protection rule for main → "Require status checks to pass" → e2e) and
+# nothing reaches production without passing it.
+name: e2e
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: aval
+          POSTGRES_PASSWORD: aval
+          POSTGRES_DB: aval
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U aval" --health-interval 5s --health-timeout 5s --health-retries 10
+
+    env:
+      CI: "true"
+      # The tests sign in and reload far more than a person: no rate limits (ignored in production).
+      E2E_NO_RATE_LIMITS: "1"
+      APP_URL: http://localhost:3000
+      DATABASE_URL: postgresql://aval:aval@localhost:5432/aval
+      # Local S3-compatible storage for profile photos (started below).
+      AWS_ENDPOINT_URL_S3: http://localhost:4569
+      AWS_ACCESS_KEY_ID: S3RVER
+      AWS_SECRET_ACCESS_KEY: S3RVER
+      AWS_REGION: us-east-1
+      STORAGE_BUCKET: aval-media
+      # Optional: a separate Ably key just for CI. With it, the live photo update
+      # and typing tests run over real-time; without it the app polls and the
+      # typing test is skipped.
+      ABLY_API_KEY: ${{ secrets.E2E_ABLY_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Unit tests, lint, typecheck
+        run: |
+          pnpm test
+          pnpm lint
+          pnpm typecheck
+
+      - name: Database (migrations + the two test users)
+        run: |
+          pnpm db:migrate
+          pnpm db:seed
+
+      - name: Local object storage
+        run: |
+          mkdir -p "$RUNNER_TEMP/s3"
+          nohup pnpm dlx s3rver@3.7.1 -d "$RUNNER_TEMP/s3" -a 127.0.0.1 -p 4569 --configure-bucket aval-media --silent > "$RUNNER_TEMP/s3rver.log" 2>&1 &
+          for i in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:4569 && break; sleep 1; done
+
+      - name: Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium webkit
+
+      # Playwright starts the app (pnpm dev) and runs on Pixel and iPhone screens.
+      - name: End-to-end tests
+        run: pnpm e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

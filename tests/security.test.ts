@@ -60,3 +60,11 @@ describe("safeNext (open-redirect guard)", () => {
     expect(safeNext(null)).toBe("/chats");
   });
 });
+
+describe("E2E_NO_RATE_LIMITS", () => {
+  it("is ignored in production builds", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync(new URL("../src/lib/security/rate-limit.ts", import.meta.url), "utf8");
+    expect(src).toMatch(/const testRunWithoutLimits = !IS_PROD && process\.env\.E2E_NO_RATE_LIMITS === "1";/);
+  });
+});

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/field";
 import { Sheet } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useRealtimeEvent } from "@/components/realtime/realtime-provider";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
 import { api, ClientApiError } from "@/lib/client/api";
@@ -240,6 +241,11 @@ export function ProfileSheet({
     }
   }
 
+  // Re-read when they change their photo or name while this is open.
+  const [revision, setRevision] = useState(0);
+  useRealtimeEvent((e) => {
+    if (e.name === "user.updated" && e.data.userId === peerId && open) setRevision((r) => r + 1);
+  });
   useEffect(() => {
     if (!open || !peerId) return;
     let cancelled = false;
@@ -249,7 +255,7 @@ export function ProfileSheet({
     return () => {
       cancelled = true;
     };
-  }, [open, peerId]);
+  }, [open, peerId, revision]);
 
   async function toggleBlock() {
     if (!profile) return;

@@ -1,10 +1,12 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
+import { usePathname } from "next/navigation";
 import { useOffline } from "next/offline";
 import { useState } from "react";
 import { Download, RefreshCw, Share, SquarePlus, WifiOff, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
 import { LogoMark } from "@/components/ui/logo";
 import { Sheet } from "@/components/ui/sheet";
 import { usePwa } from "./pwa";
@@ -80,16 +82,21 @@ export function InstallBanner() {
 /** "New version" pill. Reloading picks up the new build and its service worker. */
 export function UpdateBar() {
   const { updateReady } = usePwa();
+  // In a chat the bottom is the composer's: the pill drops in under the chat header instead.
+  const inChat = usePathname().startsWith("/chats/");
   return (
     <AnimatePresence>
       {updateReady && (
         <motion.div
           role="status"
-          initial={{ y: 24, opacity: 0 }}
+          initial={{ y: inChat ? -24 : 24, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 24, opacity: 0 }}
+          exit={{ y: inChat ? -24 : 24, opacity: 0 }}
           transition={{ type: "spring", stiffness: 420, damping: 34 }}
-          className="glass-3 fixed inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] z-50 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-3 rounded-2xl py-2 pr-2 pl-4 text-sm"
+          className={cn(
+            "glass-3 fixed inset-x-0 z-50 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-3 rounded-2xl py-2 pr-2 pl-4 text-sm",
+            inChat ? "top-[calc(max(0.5rem,env(safe-area-inset-top))+76px)]" : "bottom-[max(1rem,env(safe-area-inset-bottom))]",
+          )}
         >
           <span className="font-medium">A new version of Aval is ready.</span>
           <Button size="sm" onClick={() => location.reload()}>

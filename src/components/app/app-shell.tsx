@@ -12,6 +12,7 @@ import { RealtimeProvider } from "@/components/realtime/realtime-provider";
 import { cn } from "@/lib/cn";
 import type { ChatListItemDTO } from "@/lib/chats/types";
 import { OfflineBar } from "./pwa-banners";
+import { useVisualViewport } from "./use-visual-viewport";
 import { UserProvider, type ClientUser } from "./user-context";
 
 /**
@@ -29,6 +30,7 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const listRoute = pathname === "/chats";
+  useVisualViewport();
 
   return (
     <UserProvider user={user}>
@@ -38,7 +40,7 @@ export function AppShell({
           <NotificationsProvider>
           <LightboxProvider>
           <AvatarViewerProvider>
-          <div className="flex h-dvh overflow-hidden pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
+          <div className="app-shell flex pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
             <aside
               className={cn(
                 "relative flex w-full flex-col border-line md:w-[360px] md:shrink-0 md:border-r lg:w-[400px]",

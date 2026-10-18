@@ -127,5 +127,10 @@ export function RealtimeProvider({ userId, children }: { userId: string; childre
     };
   }, [userId, emit]);
 
+  // The connection state on <html data-realtime>, for the end-to-end tests (e2e/) to wait on.
+  useEffect(() => {
+    document.documentElement.dataset.realtime = status;
+  }, [status]);
+
   return <RealtimeContext value={{ status, subscribe }}>{children}</RealtimeContext>;
 }
